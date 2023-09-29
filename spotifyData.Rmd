@@ -7,12 +7,13 @@ date: "2023-09-29"
 library(dplyr)
 library(ggplot2)
 
-datos <- read.csv("C:\\Users\\David\\Desktop\\playlist_2010to2022.csv",sep=",",dec=".")
-str(datos)
+str(datosSPOTIFY)
 
-for (i in datos$artist_genres) {
+
+
+for (i in datosSPOTIFY$artist_genres) {
   if ( grepl("pop",i)){
-    datos$artist_genres[datos$artist_genres == i] <- 'pop'
+    datosSPOTIFY$artist_genres[datosSPOTIFY$artist_genres == i] <- 'pop'
   }
 }
 ```
