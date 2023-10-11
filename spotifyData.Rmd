@@ -20,3 +20,23 @@ for (i in datosSPOTIFY$artist_genres) {
   }
 }
 ```
+
+
+
+
+#t.test(datos$una variable~otra variable) T-Student para todas las continuas
+
+# p-valor <= 0,005 rechazamos H0 (media iguales mu0=mu1)
+
+# sample(1:dim(datos)[1],100,replace="FALSE") coge una muestra de 100 datos mostrando los indices, la columna [1]
+
+# chisq.test(table(datos$una variable, datos$otra variable))  Chi-Cuadrado para todas las discretas
+
+
+# Super hits?
+# Que artistas tienen mas popularidad, actuales o antiguos?
+# Canciones largas son superhists?
+# El instrumental o el nivel de sonido es importante?
+# Canciones con un nivel de sonido bajo es posible que sea un superhit?
+# Una cancion con poca danzabilidad puede ser superhit?
+
