@@ -3,9 +3,12 @@ title: "SpotiData"
 output: html_document
 date: "2023-09-29"
 ---
+
+
 ```{r cargamos los datos}
 library(dplyr)
 library(ggplot2)
+
 
 str(datosSPOTIFY)
 
