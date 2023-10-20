@@ -5,21 +5,217 @@ date: "2023-09-29"
 ---
 
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(ggplot2)
+library(MASS)
+```
+
 ```{r cargamos los datos}
 library(dplyr)
 library(ggplot2)
-
-
-str(datosSPOTIFY)
-
-
-
-for (i in datosSPOTIFY$artist_genres) {
-  if ( grepl("pop",i)){
-    datosSPOTIFY$artist_genres[datosSPOTIFY$artist_genres == i] <- 'pop'
-  }
-}
+#str(datosSPOTIFY)
+#"C:\\Users\\David\\Desktop\\playlist_2010to2022.csv"
+datosSPOTIFY <- read.csv("C:\\Users\\David\\Desktop\\playlist_2010to2022.csv", sep=",", dec=".")
+datos <- read.csv("C:\\Users\\David\\Desktop\\playlist_2010to2022.csv", sep=",", dec=".")
 ```
+
+
+```{r filtro de generos}
+for (i in datos$artist_genres) {
+  if( grepl("rap",i) ){
+    datos$artist_genres[datos$artist_genres == i] <- 'rap'
+  }
+  else if( grepl("r&b",i) ||  grepl("soul",i) ){
+    datos$artist_genres[datos$artist_genres == i] <- 'r&b'
+  }
+    else if( grepl("urban contemporary",i) ||  grepl("hop",i) || grepl("urbano latino",i) || grepl("reggaeton",i)  ){
+    datos$artist_genres[datos$artist_genres == i] <- 'urban'
+    }
+    else if( grepl("metal",i) ){
+    datos$artist_genres[datos$artist_genres == i] <- 'metal'
+      }
+  else if( grepl("rock",i) ){
+    datos$artist_genres[datos$artist_genres == i] <- 'rock'
+      }
+  else if( grepl("edm",i) ||  grepl("trance",i) ||  grepl("electronica",i) ||  grepl("dance",i) ||  grepl("house",i)  || grepl("uk garage",i)){
+    datos$artist_genres[datos$artist_genres == i] <- 'edm'
+  }
+  else if( grepl("k pop",i) ){
+    datos$artist_genres[datos$artist_genres == i] <- 'k pop'
+  }
+      else if ( grepl("country",i)){
+    datos$artist_genres[datos$artist_genres == i] <- 'country'
+  }
+  else if ( grepl("pop",i) || grepl("boy band",i) || grepl("mellow",i)){
+    datos$artist_genres[datos$artist_genres == i] <- 'pop'
+  }
+  else ( datos$artist_genres[datos$artist_genres == i] <- 'otros')
+
+}
+
+datos = datos %>% mutate(target =if_else(track_popularity >= 75, 1,0))
+View(cbind(datos$track_popularity,datos$target))
+
+
+datos$artist_genres <- as.factor(datos$artist_genres)
+
+
+
+```
+
+
+```{r}
+datos = datos %>% mutate(target =if_else(track_popularity >= 75, 1,0))
+#View(cbind(datos$track_popularity,datos$target))
+
+```
+
+
+## Analisis Exploratorio
+
+```{r graficos generos}
+
+#generos <- c("pop", "rap", "r&b" ,"urban contemporary", "rock", "edm", "urbano latino", "metal", "k pop", "otros", "country")
+
+barplot(table(datos$artist_genres))
+table(datos$artist_genres)
+
+
+```
+
+
+```{r}
+plot(datos$target , datos$danceability)
+plot(datos$target , datos$energy)
+plot(datos$target , datos$key)
+plot(datos$target , datos$tempo)
+plot(datos$target , datos$artist_popularity)
+plot(datos$target , datos$liveness)
+plot(datos$target , (datos$duration_ms))
+```
+
+
+
+```{r}
+plot(datos$energy , datos$loudness)
+plot(datos$tempo , datos$danceability)
+
+dataframe = cbind( danceability = datos$danceability,energy = datos$energy,loudness = datos$loudness, speechiness = datos$speechiness,acousticness =  datos$acousticness, instrumentalness = datos$instrumentalness, liveness = datos$liveness,valence = datos$valence,tempo= datos$tempo,duration_ms = datos$duration_ms )
+
+
+dataframe2 = cbind( danceability = datos$danceability,energy = datos$energy,loudness = datos$loudness)
+
+pairs(dataframe)
+plot( datos$target, datos$loudness)
+plot(datos$target, datos$danceability)
+plot(datos$target, datos$energy)
+plot(datos$target, datos$instrumentalness)
+
+```
+
+
+
+```{r}
+modelo <- lm(datos$energy~datos$loudness)
+plot(datos$loudness,datos$energy)
+abline(modelo)
+summary(modelo)
+cor(datos$loudness,datos$energy)
+
+acousticness2 = (datos$acousticness)^1.3
+
+modelo2 <- lm(datos$energy~acousticness2)
+plot(datos$acousticness,datos$energy)
+abline(modelo2)
+summary(modelo2)
+cor(datos$acousticness,datos$energy)
+boxcox(modelo2)
+
+
+modelo3 <- lm(datos$loudness ~ datos$energy + datos$acousticness + datos$speechiness+ datos$tempo, scale  = "T") 
+summary(modelo3)
+
+syms x
+
+funcion_objetivo = (datos$loudness - (modelo3$coefficients[1] + b1*datos$energy*L1 + b2*datos$acousticness*L2 + b3*datos$speechiness*L3 + b4*datos$tempo*L4))^2
+#modelo3$coefficients[1] es la intercepta de nuestro modelo de regresion lineal
+```
+
+
+#hacer target con {1,2,3,4}
+
+
+```{r problema}
+sum(is.na(dataframe))
+which(is.na(dataframe)) #sacamos los NA
+#tenemos que eliminar la fila 448 (cancion: These Words , Unwritten)
+datosmodificados = datos[-c(448), ]
+dataframemodificado = dataframe[-c(448),]
+cov(dataframemodificado)
+prcomp(dataframemodificado, scale="T")
+#hacer varias componentes principales incluyendo popularidad o no
+```
+
+
+
+PRIMEROS DÍAS DE DICIEMBRE 
+
+buscar quadratic optimization en R para resolver el problema con restriccione (solve.QP, ojo con las variabeles enteras ,  opt/rmpk)
+
+y = int + b0 energy + b1 aco + b2 speec 
+
+suma = (y real - int + b0 energy + b1 aco + b2 speec )^2 -> desarrollar el cuadrado, derivar e igualar a cero
+
+(sin restricciones) -> derivar e igualar a cero -> 4 eqs igualadas a cero
+   
+(con restricciones) ->  sigmaM <=  intercepta <= sigmaM      (sigma toma 0 o 1), si la intercepta son 10, poner M en el orden de 100(o se pone M muy grande)
+                       sigma2M<=  bo <= sigma2M ....     si sabemos el signo podemos eliminar una restriccion
+                       
+                       sum(sigma)<= 2
+                       
+                       
+
+
+
+
+
+
+
+
+
+```{r componentes principales}
+USArrests
+prcomp(USArrests)# nos indica las desviaciones estandar(autovalores) y las componentes principales (importantes)
+summary(prcomp(USArrests))
+prcomp(USArrests,scale="T") #cuando los datos no están escalados
+biplot(USArrests,scale="T")
+plot(prcomp(USArrests,scale="T")$x[,1:2])
+text(prcomp(USArrests)$x[,1:2],rownames(USArrests))
+biplot(prcomp(USArrests))
+```
+
+
+```{r}
+library(rmpk)
+library(ROI.plugin.glpk)
+set.seed(42)
+solver <- ROI_optimizer("glpk")
+
+v <- rnorm(10)
+w <- rnorm(10)
+
+model <- optimization_model(solver)
+x<- model$add_variable("x", type = "binary", i=1:10)
+model$set_objective(sum_expr(x[i]*x[i], i=1:10) , sense = "max")
+model$add_constraint(sum_expr(w[i]*x[i], i=1:10) <= 10)
+model$optimize()
+model$get_variable_value(x[i])
+```
+
+
+
 
 
 
