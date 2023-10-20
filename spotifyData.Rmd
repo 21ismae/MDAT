@@ -66,13 +66,34 @@ datos$artist_genres <- as.factor(datos$artist_genres)
 
 ```
 
+```{r cuantiles}
+quantile(datosmodificados$track_popularity, 0.05)
+quantile(datosmodificados$track_popularity, 0.5)
+quantile(datosmodificados$track_popularity, 0.95)
+```
+Hemos dividido nuestra variable objetivo en 4 dependiendo de los cuantiles; 
 
-```{r}
-datos = datos %>% mutate(target =if_else(track_popularity >= 75, 1,0))
+Si trackpopularity es menor que 54, se establece en 0. -> Representa el 5% de los datos MENOS POPULARES
+Si trackpopularity está entre 54 y 75, se establece en 1.  -> Representa el 45% de los datos 
+Si trackpopularity está entre 75 y 85, se establece en 2. -> Representa el 45% de los datos 
+Si trackpopularity está entre 86 y 100, se establece en 3.-> Representa el 5% de los datos MAS POPULARES
+
+
+```{r variable target}
+
+datosmodificados = datos[-c(448), ]
+#quantile(datosmodificados$track_popularity)
+datos = datos %>% 
+  mutate(target =if_else(track_popularity <= 54, 0, ifelse(54 < track_popularity  & track_popularity <= 72, 1, ifelse(track_popularity > 72 & track_popularity < 86, 2, 3 )))) #quantile(datosmodificados$track_popularity, 0.05)
+
+
+datosmodificados = datosmodificados %>% 
+  mutate(target =if_else(track_popularity <= 54, 0, ifelse(54 < track_popularity  & track_popularity <= 72, 1, ifelse(track_popularity > 72 & track_popularity < 86, 2, 3 )))) #quantile(datosmodificados$track_popularity, 0.05)
+
+  
 #View(cbind(datos$track_popularity,datos$target))
 
 ```
-
 
 ## Analisis Exploratorio
 
@@ -148,15 +169,51 @@ funcion_objetivo = (datos$loudness - (modelo3$coefficients[1] + b1*datos$energy*
 #hacer target con {1,2,3,4}
 
 
-```{r problema}
+```{r componentes principales}
 sum(is.na(dataframe))
 which(is.na(dataframe)) #sacamos los NA
 #tenemos que eliminar la fila 448 (cancion: These Words , Unwritten)
-datosmodificados = datos[-c(448), ]
+
+
+
 dataframemodificado = dataframe[-c(448),]
 cov(dataframemodificado)
-prcomp(dataframemodificado, scale="T")
-#hacer varias componentes principales incluyendo popularidad o no
+prcomp(dataframemodificado)
+prcomp(dataframemodificado, scale=TRUE)
+
+#Gráficos relacionados con la variable respuesta, nos quedamos hasta PC4
+
+
+plot(prcomp(dataframemodificado,scale=TRUE)$x[,1:2], type="n")
+text(prcomp(dataframemodificado)$x[,1:2],rownames(datosmodificados$target))
+
+plot(prcomp(dataframemodificado,scale=TRUE)$x[,1:3])
+col(datos$target +1 )
+plot(prcomp(dataframemodificado,scale=TRUE)$x[,1:4])
+plot(prcomp(dataframemodificado,scale=TRUE)$x[,2:3] , type="n")
+text(prcomp(dataframemodificado)$x[,2:3],rownames(datosmodificados$target))
+plot(prcomp(dataframemodificado,scale=TRUE)$x[,2:4])
+plot(prcomp(dataframemodificado,scale=TRUE)$x[,3:4])
+
+
+biplot(prcomp(dataframemodificado, scale=TRUE))
+
+
+colores <- c("red", "green", "blue", "purple")
+#Gráfico de componentes principales (PC2 y PC3)
+plot(prcomp(dataframemodificado, scale = TRUE)$x[, 2:3], col = datosmodificados$target + 1)
+
+
+#Etiqueta de puntos con colores correspondientes
+for (i in 1:length(datosmodificados$target)) {
+  text(prcomp(dataframemodificado)$x[i, 2:3], labels = "", col = datosmodificados$target + 1)
+}
+
+#Agregar leyenda
+legend("topright", legend = c("0", "1", "2", "3"), col = c("1", "2", "3", "4"), pch = 1, title = "Categorías")
+
+
+
 ```
 
 
