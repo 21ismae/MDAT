@@ -5,117 +5,324 @@ date: "2023-09-29"
 ---
 
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+# 1. Business Understanding
+
+Este modelo se va a centrar en realizar un análisis de las canciones que han sido hit entre los años 2000-2022 en la plataforma de Spotify, con el objetivo de determinar qué canción será un hit de máxima popularidad.
+
+
+# 2. Data Understanding
+
+## 2.1. Descripción de los datos obtenidos de Spotify (Obtenidos via Kaggle)
+
+***Variables cualitativas*** 
+  
+  * playlist_url: dirección de la playlist que contiene los hits de cada año
+  
+  * track_id: id de la canción en Spotify
+  
+  * track_name: nombre de la canción
+  
+  * album: álbum al que pertenece la canción
+
+  * artist_id: id del artista que realiza la canción
+
+  * artist_genres: géneros musicales a los que está asociado el artista que realiza la canción
+  
+***Variables cuantitativas***
+
+  * year: año de la canción
+
+  * track_popularity: popularidad de la canción en una escala de 0-100
+
+  * artist_popularity: popularidad del artista de la canción en una escala de 0-100
+
+  * danceability: capacidad de una canción de ser bailable en escala de 0-1
+
+  * energy: medida en escala de 0-1 que representa una medida perceptual de la intensidad y actividad de la canción
+
+  * key: clave musical en la que se encuentra la canción, en notación estándar de las notas. Por ejemplo 0 = C, 1 = C♯/D♭, 2 = D
+
+  * loudness: volumen general de la canción medido en decibelios (dB)
+
+  * mode: modalidad (mayor o menor) de la canción. La modalidad "mayor" está representada por 1 y la modalidad "menor" por 0
+
+  * speechiness: presencia de palabras habladas en la canción respecto a la duración de esta, en escala de 0-1
+
+  * acousticness: medida de confianza en escala de 0-1 de la acústica de la canción
+
+  * instrumentalness: presencia de instrumentos en la canción respecto a la duración de esta, en escala de 0-1
+
+  * liveness: medida de la identificación de sonidos o señales que indican la existencia de un público o audiencia en la grabación musical de la canción
+
+  * valence: medida en escala de 0-1 que describe la positividad musical que transmite la canción
+
+  * tempo: velocidad y ritmo estimado de la canción en pulsaciones por minuto (BPM)
+
+  * duration_ms: duración de la canción en milisegundos
+
+  * time_signature: compás o ritmo estimado de la canción
+
+
+## 2.2. Paquetes importados
+
+```{r paquetes}
+
 library(dplyr)
 library(ggplot2)
 library(MASS)
-aaa
+library(graphics)
+library(ellipse)   # Correlaciones
+
 ```
+
+
+## 2.3. Importación de datos
 
 ```{r cargamos los datos}
-library(dplyr)
-library(ggplot2)
+
 #str(datosSPOTIFY)
+
+# Seleccion datos David:
 #"C:\\Users\\David\\Desktop\\playlist_2010to2022.csv"
-datosSPOTIFY <- read.csv("C:\\Users\\David\\Desktop\\playlist_2010to2022.csv", sep=",", dec=".")
-datos <- read.csv("C:\\Users\\David\\Desktop\\playlist_2010to2022.csv", sep=",", dec=".")
+
+# Isma:
+#C:\\UNIVERSIDAD\\4º\\Minería de datos\\MDAT\\datos\\playlist_2010to2022.csv
+
+
+datosBase <- read.csv("C:\\UNIVERSIDAD\\4º\\Minería de datos\\MDAT\\datos\\playlist_2010to2022.csv", sep=",", dec=".")
 ```
 
 
-```{r filtro de generos}
-for (i in datos$artist_genres) {
-  if( grepl("rap",i) ){
-    datos$artist_genres[datos$artist_genres == i] <- 'rap'
-  }
-  else if( grepl("r&b",i) ||  grepl("soul",i) ){
-    datos$artist_genres[datos$artist_genres == i] <- 'r&b'
-  }
-    else if( grepl("urban contemporary",i) ||  grepl("hop",i) || grepl("urbano latino",i) || grepl("reggaeton",i)  ){
-    datos$artist_genres[datos$artist_genres == i] <- 'urban'
-    }
-    else if( grepl("metal",i) ){
-    datos$artist_genres[datos$artist_genres == i] <- 'metal'
-      }
-  else if( grepl("rock",i) ){
-    datos$artist_genres[datos$artist_genres == i] <- 'rock'
-      }
-  else if( grepl("edm",i) ||  grepl("trance",i) ||  grepl("electronica",i) ||  grepl("dance",i) ||  grepl("house",i)  || grepl("uk garage",i)){
-    datos$artist_genres[datos$artist_genres == i] <- 'edm'
-  }
-  else if( grepl("k pop",i) ){
-    datos$artist_genres[datos$artist_genres == i] <- 'k pop'
-  }
-      else if ( grepl("country",i)){
-    datos$artist_genres[datos$artist_genres == i] <- 'country'
-  }
-  else if ( grepl("pop",i) || grepl("boy band",i) || grepl("mellow",i)){
-    datos$artist_genres[datos$artist_genres == i] <- 'pop'
-  }
-  else ( datos$artist_genres[datos$artist_genres == i] <- 'otros')
+## 2.4. Limpiar datos
 
-}
+Veamos cuantos NA tenemos, para buscar solución e interpretación de estos.
 
-datos = datos %>% mutate(target =if_else(track_popularity >= 75, 1,0))
-View(cbind(datos$track_popularity,datos$target))
+```{r problema NA}
+sum(is.na(datosBase))
+which(is.na(datosBase)) #sacamos los NA
+#tenemos que eliminar la fila 448 (cancion: These Words , Unwritten)
+datosModificados = datosBase[-c(448), ]
+
+```
+
+Como solo teníamos una canción con sus variables NA, en cómputo queneral es algo que no está aportando nada ya que simplemente es un error o falta de información en la base de datos. Al ser mínimo, podemos poner la media de cada variable o simplemente quitarlo ya que no es significativo. Hemos optado por quitarlo.
+
+Veamos un pequeño resumen de nuestros datos (con un ejemplo de visualización):
+
+```{r}
+
+dim(datosModificados) # vemos las dimensiones de nuestros datos (numero de registros y variables)
+summary(datosModificados) # resumen de los datos por cada variable
+head(datosModificados) # Imprimimos algunos datos como ejemplo
+```
 
 
-datos$artist_genres <- as.factor(datos$artist_genres)
+
+Las variables playlist_url, track_id y artist_id son candidatas a que las limpiemos.
+
+```{r quitar ids?}
+
+```
+
+
+
+PREGUNTAR.......................................................
+```{r quitar ids problema nombres por ser diferente año}
+
+frecuencia_nombres <- table(datosModificados$track_name)
+
+mean(frecuencia_nombres)
+
+nombres_frecuencia_mayor_1 <- names(frecuencia_nombres[frecuencia_nombres > 1])
+
+# Muestra los nombres con frecuencia mayor que 1
+print(nombres_frecuencia_mayor_1)
 
 
 
 ```
+
+
+Salen bastantes nombres repetidos, hemos visto que es porque aparecen varios años. Haciendo una investigación sobre la fuente, se debe a que estos hits se extraen de playlists creadas por Spotify de cada año. Por esa razón, si una canción aparece en la playlist de top hits 2021 y a la vez en la de 2022, la canción aparece 2 veces en la base de datos, solo con el año cambiado.
+
+
+
+## Definición de la variable Target
+
+
 
 ```{r cuantiles}
-quantile(datosmodificados$track_popularity, 0.05)
-quantile(datosmodificados$track_popularity, 0.5)
-quantile(datosmodificados$track_popularity, 0.95)
-```
-Hemos dividido nuestra variable objetivo en 4 dependiendo de los cuantiles; 
 
-Si trackpopularity es menor que 54, se establece en 0. -> Representa el 5% de los datos MENOS POPULARES
-Si trackpopularity está entre 54 y 75, se establece en 1.  -> Representa el 45% de los datos 
-Si trackpopularity está entre 75 y 85, se establece en 2. -> Representa el 45% de los datos 
-Si trackpopularity está entre 86 y 100, se establece en 3.-> Representa el 5% de los datos MAS POPULARES
+quantile(datosModificados$track_popularity, 0.05)
+quantile(datosModificados$track_popularity, 0.5)
+quantile(datosModificados$track_popularity, 0.95)
+```
+
+Vamos a dividir nuestra variable objetivo (target) en 4 dependiendo de los cuantiles; 
+
+- Si trackpopularity es menor que 54, se establece en 0. -> Representa el 5% de los datos MENOS POPULARES
+- Si trackpopularity está entre 54 y 75, se establece en 1.  -> Representa el 45% de los datos 
+- Si trackpopularity está entre 75 y 85, se establece en 2. -> Representa el 45% de los datos 
+- Si trackpopularity está entre 86 y 100, se establece en 3.-> Representa el 5% de los datos MAS POPULARES
 
 
 ```{r variable target}
 
-datosmodificados = datos[-c(448), ]
-#quantile(datosmodificados$track_popularity)
-datos = datos %>% 
-  mutate(target =if_else(track_popularity <= 54, 0, ifelse(54 < track_popularity  & track_popularity <= 72, 1, ifelse(track_popularity > 72 & track_popularity < 86, 2, 3 )))) #quantile(datosmodificados$track_popularity, 0.05)
+
+#quantile(datosModificados$track_popularity)
 
 
-datosmodificados = datosmodificados %>% 
-  mutate(target =if_else(track_popularity <= 54, 0, ifelse(54 < track_popularity  & track_popularity <= 72, 1, ifelse(track_popularity > 72 & track_popularity < 86, 2, 3 )))) #quantile(datosmodificados$track_popularity, 0.05)
-
+datosModificados = datosModificados %>% 
+  mutate(target = if_else(track_popularity <= 54, 0, ifelse(54 < track_popularity  & track_popularity <= 72, 1, ifelse(track_popularity > 72 & track_popularity < 86, 2, 3 )))) #quantile(datosmodificados$track_popularity, 0.05)
   
 #View(cbind(datos$track_popularity,datos$target))
+```
+
+
+
+## Filtrar géneros
+
+Debido a que la variable artist_genres nos da varios géneros en una misma variable cualitativa, vamos a quedarnos con el género más significativo para cada caso.
+
+Esto sería un trabajo a realizar junto a un experto en el tema, pero como no contamos con uno, lo que hemos hecho ha sido ver todos los géneros que aparecen y, tras previa búsqueda de información sobre cada género, hemos agrupado cada subgénero en su género principal.
+
+Además, hemos creado un género llamado 'Otros', donde se guardan los que NO pertenecen a alguno de los principales.
+
+Como dato a tener en cuenta, la mayoría de subgeneros se incluirían en Pop, ya que al ser una base de datos de hits, la propia definición de este género nos obligaría a meterlos, resultando en una pérdida importante de información. 
+
+Para solucionar esto, si cualquiera de los otros géneros aparece en esa observación, nos quedamos con el otro, en vez de coger siempre Pop. Todo esto es posible gracias a que estamos haciendo esta construcción mediante else-ifs.
+
+
+
+
+
+```{r filtro de generos}
+for (i in datosModificados$artist_genres) {
+  if( grepl("rap",i) ){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'rap'
+  }
+  else if( grepl("r&b",i) ||  grepl("soul",i) ){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'r&b'
+  }
+    else if( grepl("urban contemporary",i) ||  grepl("hop",i) || grepl("urbano latino",i) || grepl("reggaeton",i)  ){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'urban'
+    }
+    else if( grepl("metal",i) ){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'metal'
+      }
+  else if( grepl("rock",i) ){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'rock'
+      }
+  else if( grepl("edm",i) ||  grepl("trance",i) ||  grepl("electronica",i) ||  grepl("dance",i) ||  grepl("house",i)  || grepl("uk garage",i)){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'edm'
+  }
+  else if( grepl("k pop",i) ){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'k pop'
+  }
+      else if ( grepl("country",i)){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'country'
+  }
+  else if ( grepl("pop",i) || grepl("boy band",i) || grepl("mellow",i)){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'pop'
+  }
+  else ( datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'otros')
+
+}
+
+
+
+datosModificados$artist_genres <- as.factor(datosModificados$artist_genres)
+
+
 
 ```
 
-## Analisis Exploratorio
+
+Veamos cómo quedan repartidos los géneros, para verificar que la separación realizada tiene algún sentido.
 
 ```{r graficos generos}
 
-#generos <- c("pop", "rap", "r&b" ,"urban contemporary", "rock", "edm", "urbano latino", "metal", "k pop", "otros", "country")
 
-barplot(table(datos$artist_genres))
-table(datos$artist_genres)
+barplot(table(datosModificados$artist_genres))
+table(datosModificados$artist_genres)
 
 
 ```
 
 
+
+
+## Clasificación en Train, Test y Validación
+
+
+Dividimos los datos en diferentes tablas que utilizaremos para entrenar, hacer pruebas y validar resultado.
+
 ```{r}
-plot(datos$target , datos$danceability)
-plot(datos$target , datos$energy)
-plot(datos$target , datos$key)
-plot(datos$target , datos$tempo)
-plot(datos$target , datos$artist_popularity)
-plot(datos$target , datos$liveness)
-plot(datos$target , (datos$duration_ms))
+
+n_total= dim(datosModificados)[1]
+n_train = n_total * .5     # La mitad de los datos son para train
+n_test = n_total *.25      # 1/4 para probar
+
+indices_totales = seq(1:n_total)
+indices_train = sample(indices_totales, n_train)
+indices_test = sample(indices_totales[-indices_train],n_test)
+
+datos = datosModificados[indices_train,]    # Los datos de train, como son los más utilizados los llamamos datos
+datos_test = datosModificados[indices_test,]
+datos_validation = datosModificados[-c(indices_test,indices_train),]
+```
+
+
+
+
+
+
+# Analisis Exploratorio
+
+Para comenzar con nuestro anánisis, lo primero que vamos a hacer es crear un Data Frame solo con las variables cuantitativas. Y por otro lado, uno con las variables continuas.
+
+```{r creacion dataframe de cuantitativos y continuos}
+
+datosCuant = cbind( year = datos$year, track_popularity = datos$track_popularity, artist_popularity = datos$artist_popularity ,danceability = datos$danceability,energy = datos$energy,loudness = datos$loudness, speechiness = datos$speechiness,acousticness =  datos$acousticness, instrumentalness = datos$instrumentalness, liveness = datos$liveness,valence = datos$valence,tempo= datos$tempo,duration_ms = datos$duration_ms)
+
+datosCont = cbind( danceability = datos$danceability,energy = datos$energy,loudness = datos$loudness, speechiness = datos$speechiness,acousticness =  datos$acousticness, instrumentalness = datos$instrumentalness, liveness = datos$liveness,valence = datos$valence,tempo= datos$tempo,duration_ms = datos$duration_ms)
+
+```
+
+
+Veamos una comparación general de todas nuestras variables cuantivas:
+
+```{r pair cuant}
+
+pairs(datosCuant)
+
+```
+
+Ahora, una comparación general de todas nuestras variables CONTINUAS:
+
+```{r pair cont}
+
+pairs(datosCont)
+
+```
+
+
+Veamos la correlación existente entre las variables cuantitativas:
+
+```{r}
+plotcorr(cor(datosCuant)) # cuanto mas se asemejen las figuras a una elipse mayor es la correlacion
+```
+
+En las variables que no son continuas (year y popularities) no podemos apreciar mucha correlación con las demás, por ello, veamos solo las continuas:
+
+```{r}
+plotcorr(cor(datosCont)) # cuanto mas se asemejen las figuras a una elipse mayor es la correlacion
+```
+
+Veamos un gráfico de densidades de las variables: 
+
+```{r}
+ggplot(datosCuant, aes(x= lprice, fill=color)) + geom_density(alpha=0.3)
 ```
 
 
@@ -124,12 +331,7 @@ plot(datos$target , (datos$duration_ms))
 plot(datos$energy , datos$loudness)
 plot(datos$tempo , datos$danceability)
 
-dataframe = cbind( danceability = datos$danceability,energy = datos$energy,loudness = datos$loudness, speechiness = datos$speechiness,acousticness =  datos$acousticness, instrumentalness = datos$instrumentalness, liveness = datos$liveness,valence = datos$valence,tempo= datos$tempo,duration_ms = datos$duration_ms )
 
-
-dataframe2 = cbind( danceability = datos$danceability,energy = datos$energy,loudness = datos$loudness)
-
-pairs(dataframe)
 plot( datos$target, datos$loudness)
 plot(datos$target, datos$danceability)
 plot(datos$target, datos$energy)
@@ -159,132 +361,188 @@ boxcox(modelo2)
 modelo3 <- lm(datos$loudness ~ datos$energy + datos$acousticness + datos$speechiness+ datos$tempo, scale  = "T") 
 summary(modelo3)
 
-syms x
-
-funcion_objetivo = (datos$loudness - (modelo3$coefficients[1] + b1*datos$energy*L1 + b2*datos$acousticness*L2 + b3*datos$speechiness*L3 + b4*datos$tempo*L4))^2
-#modelo3$coefficients[1] es la intercepta de nuestro modelo de regresion lineal
-```
-
-
-#hacer target con {1,2,3,4}
-
-
-```{r componentes principales}
-sum(is.na(dataframe))
-which(is.na(dataframe)) #sacamos los NA
-#tenemos que eliminar la fila 448 (cancion: These Words , Unwritten)
-
-
-
-dataframemodificado = dataframe[-c(448),]
-cov(dataframemodificado)
-prcomp(dataframemodificado)
-prcomp(dataframemodificado, scale=TRUE)
-
-#Gráficos relacionados con la variable respuesta, nos quedamos hasta PC4
-
-
-plot(prcomp(dataframemodificado,scale=TRUE)$x[,1:2], type="n")
-text(prcomp(dataframemodificado)$x[,1:2],rownames(datosmodificados$target))
-
-plot(prcomp(dataframemodificado,scale=TRUE)$x[,1:3])
-col(datos$target +1 )
-plot(prcomp(dataframemodificado,scale=TRUE)$x[,1:4])
-plot(prcomp(dataframemodificado,scale=TRUE)$x[,2:3] , type="n")
-text(prcomp(dataframemodificado)$x[,2:3],rownames(datosmodificados$target))
-plot(prcomp(dataframemodificado,scale=TRUE)$x[,2:4])
-plot(prcomp(dataframemodificado,scale=TRUE)$x[,3:4])
-
-
-biplot(prcomp(dataframemodificado, scale=TRUE))
-
-
-colores <- c("red", "green", "blue", "purple")
-#Gráfico de componentes principales (PC2 y PC3)
-plot(prcomp(dataframemodificado, scale = TRUE)$x[, 2:3], col = datosmodificados$target + 1)
-
-
-#Etiqueta de puntos con colores correspondientes
-for (i in 1:length(datosmodificados$target)) {
-  text(prcomp(dataframemodificado)$x[i, 2:3], labels = "", col = datosmodificados$target + 1)
-}
-
-#Agregar leyenda
-legend("topright", legend = c("0", "1", "2", "3"), col = c("1", "2", "3", "4"), pch = 1, title = "Categorías")
-
-
 
 ```
 
 
 
-PRIMEROS DÍAS DE DICIEMBRE 
 
-buscar quadratic optimization en R para resolver el problema con restriccione (solve.QP, ojo con las variabeles enteras ,  opt/rmpk)
+Vamos a hacer el estudio de PCA de las variables continuas, primero lo haremos con éstas escaladas y despues sin escalar, para ver si la diferencia nos infiere alguna conclusión.
 
-y = int + b0 energy + b1 aco + b2 speec 
+# Variables continuas ESCALADAS
 
-suma = (y real - int + b0 energy + b1 aco + b2 speec )^2 -> desarrollar el cuadrado, derivar e igualar a cero
+Primero escalamos los datos continuos
 
-(sin restricciones) -> derivar e igualar a cero -> 4 eqs igualadas a cero
-   
-(con restricciones) ->  sigmaM <=  intercepta <= sigmaM      (sigma toma 0 o 1), si la intercepta son 10, poner M en el orden de 100(o se pone M muy grande)
-                       sigma2M<=  bo <= sigma2M ....     si sabemos el signo podemos eliminar una restriccion
-                       
-                       sum(sigma)<= 2
-                       
-                       
+```{r Creacion de datosContEscalados}
 
-
-
-
-
-
-
-
-
-```{r componentes principales}
-USArrests
-prcomp(USArrests)# nos indica las desviaciones estandar(autovalores) y las componentes principales (importantes)
-summary(prcomp(USArrests))
-prcomp(USArrests,scale="T") #cuando los datos no están escalados
-biplot(USArrests,scale="T")
-plot(prcomp(USArrests,scale="T")$x[,1:2])
-text(prcomp(USArrests)$x[,1:2],rownames(USArrests))
-biplot(prcomp(USArrests))
+datosContEscalados = scale(datosCont)
+n = dim(datosContEscalados)[1]
+p = dim(datosContEscalados)[2]
 ```
+
+Una vez tenemos los datos escalados, hacemos un análisis de las componentes principales para éstos.
 
 
 ```{r}
-library(rmpk)
-library(ROI.plugin.glpk)
-set.seed(42)
-solver <- ROI_optimizer("glpk")
 
-v <- rnorm(10)
-w <- rnorm(10)
+analisisPCA <- prcomp(datosContEscalados, scale= TRUE)
 
-model <- optimization_model(solver)
-x<- model$add_variable("x", type = "binary", i=1:10)
-model$set_objective(sum_expr(x[i]*x[i], i=1:10) , sense = "max")
-model$add_constraint(sum_expr(w[i]*x[i], i=1:10) <= 10)
-model$optimize()
-model$get_variable_value(x[i])
+cov(datosContEscalados)
+
+analisisPCA
+
+```
+
+Veamos la información acumulada que nos va aportando cada componente principal
+
+```{r}
+
+summary(analisisPCA)
+
+
+#hacer varias componentes principales incluyendo popularidad o no
+```
+
+
+Podemos considerar que la proporción acumulada a partir de PC4 (0.6006) no aumenta de manera considerable y es un porcentaje suficientemente grande de explicabilidad de los datos.
+
+
+
+
+
+```{r Elección de numero de clusters}
+
+
+
+#clusters2.datosCont = kmeans(datosContEscalados, centers=2, nstart=25)
+
+#Inicializamos el vector
+SSW <- vector(mode = "numeric", length = 15)
+
+
+
+
+#Variabilidad de todos los datos, es decir, todos los datos como un único cluster
+SSW[1] <- (n - 1) * sum(apply(datosContEscalados,2,var)) 
+
+#Variabilidad de cada modelo, desde 2 clusters hasta 15 clusters
+for (i in 2:15) SSW[i] <- sum(kmeans(datosContEscalados,centers=i,nstart=25)$withinss)
+
+
+
+#Dibujamos un gráfico con el resultado
+plot(1:15, SSW, type="b", xlab="Number of Clusters", ylab="Sum of squares within groups",pch=19, col="steelblue4")
+
+
+
+
+
+```
+
+Se aprecia que a partir de 5 hay un "codo" por lo que nos vamos a quedar con 5 clusters.
+
+
+Veamos que si no hubiesemos escalado los datos, el numero de clusters que escogeríamos cambia.
+
+
+```{r }
+
+#Inicializamos el vector
+SSW2 <- vector(mode = "numeric", length = 15)
+
+#Variabilidad de todos los datos, es decir, todos los datos como un único cluster
+SSW2[1] <- (n - 1) * sum(apply(datosCont,2,var)) 
+
+#Variabilidad de cada modelo, desde 2 clusters hasta 15 clusters
+for (i in 2:15) SSW2[i] <- sum(kmeans(datosCont,centers=i,nstart=25)$withinss)
+
+#Dibujamos un gráfico con el resultado
+plot(1:15, SSW2, type="b", xlab="Number of Clusters", ylab="Sum of squares within groups",pch=19, col="steelblue4")
+```
+
+
+Calculamos los 5 cluster, para 25 casos y se queda con el mejor
+                   
+```{r}
+# k-means para 5 grupos y 25 arranques diferentes
+
+clusters5.datos <- kmeans(datosContEscalados, 5, nstart = 25)
+
+clusters5.datos
+
+```
+
+Podemos ver en la ejecución anterior a que cluster pertenece cada observación.
+
+Ahora veamos cuales son los centroides
+
+```{r}
+centroides = aggregate(datosContEscalados,by=list(clusters5.datos$cluster),FUN=mean)
+
+t(centroides)
+```
+
+Por ejemplo, para el cluster 1 y la variable danceability, el centroide es 0.20288349
+
+
+Ahora representamos los cluster
+
+```{r}
+# Dibujamos los clusters en el scatterplot (variables 2a2)
+
+nk=5 # nk es el numero de clusters 
+pairs(datosContEscalados, col= clusters5.datos$cluster,pch=19)
+
+points(clusters5.datos$centers, col = 1:nk, pch = 19, cex=2)
+
+```
+
+
+Ahora lo hacemos con 6 clusters
+
+```{r}
+# k-means para 6 grupos y 25 arranques diferentes
+
+clusters6.datos <- kmeans(datosContEscalados, 6, nstart = 25)
+
+clusters6.datos
+
+centroides = aggregate(datosContEscalados,by=list(clusters6.datos$cluster),FUN=mean)
+
+t(centroides)
+
+# Dibujamos los clusters en el scatterplot (variables 2a2)
+
+nk=6 # nk es el numero de clusters 
+pairs(datosContEscalados, col= clusters6.datos$cluster,pch=19)
+
+points(clusters6.datos$centers, col = 1:nk, pch = 19, cex=2)
+
+
+```
+
+Esto era representando los cluster con todos los datos.
+
+Ahora repetimos el proceso pero con las PCA.
+
+
+
+```{r}
+# Guardamos el vector con el cluster correspondiente a cada país
+datos.clusters5 <- clusters5.datos$cluster
+# Vamos a hacer PCA para poder graficar los clusters en 2dimensiones!
+library(cluster)
+
+clusplot(datosContEscalados, datos.clusters5, color=TRUE, shade=TRUE, labels=2,lines=0)
+
+
+
 ```
 
 
 
 
 
-
-
-#t.test(datos$una variable~otra variable) T-Student para todas las continuas
-
-# p-valor <= 0,005 rechazamos H0 (media iguales mu0=mu1)
-
-# sample(1:dim(datos)[1],100,replace="FALSE") coge una muestra de 100 datos mostrando los indices, la columna [1]
-
-# chisq.test(table(datos$una variable, datos$otra variable))  Chi-Cuadrado para todas las discretas
 
 
 # Super hits?
