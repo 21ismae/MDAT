@@ -9,6 +9,15 @@ date: "2023-09-29"
 
 Este modelo se va a centrar en realizar un análisis de las canciones que han sido hit entre los años 2000-2022 en la plataforma de Spotify, con el objetivo de determinar qué canción será un hit de máxima popularidad.
 
+Preguntas que nos hacemos:
+
+#### Super hits?
+#### Que artistas tienen mas popularidad, actuales o antiguos?
+#### Canciones largas son superhists?
+#### El instrumental o el nivel de sonido es importante?
+#### Canciones con un nivel de sonido bajo es posible que sea un superhit?
+#### Una cancion con poca danzabilidad puede ser superhit?
+
 
 # 2. Data Understanding
 
@@ -72,6 +81,7 @@ library(ggplot2)
 library(MASS)
 library(graphics)
 library(ellipse)   # Correlaciones
+library(class)
 
 ```
 
@@ -105,10 +115,12 @@ sum(is.na(datosBase))
 which(is.na(datosBase)) #sacamos los NA
 #tenemos que eliminar la fila 448 (cancion: These Words , Unwritten)
 datosModificados = datosBase[-c(448), ]
-
+datosModificados = datosModificados[,-1] # Eliminamos la primera columna de los datos (url playlist)
 ```
 
 Como solo teníamos una canción con sus variables NA, en cómputo queneral es algo que no está aportando nada ya que simplemente es un error o falta de información en la base de datos. Al ser mínimo, podemos poner la media de cada variable o simplemente quitarlo ya que no es significativo. Hemos optado por quitarlo.
+
+Quitamos la variable que incluye la url de la playlist porque no aporta nada diferente a la variable que incluye los años en los que fueron hit las canciones, porque cada playlist es el top 100 canciones de un año.
 
 Veamos un pequeño resumen de nuestros datos (con un ejemplo de visualización):
 
@@ -170,13 +182,10 @@ Vamos a dividir nuestra variable objetivo (target) en 4 dependiendo de los cuant
 
 ```{r variable target}
 
-
 #quantile(datosModificados$track_popularity)
-
 
 datosModificados = datosModificados %>% mutate(target = if_else(track_popularity <= 54, 0, ifelse(54 < track_popularity  & track_popularity <= 72, 1, ifelse(track_popularity > 72 & track_popularity < 86, 2, 3 )))) #quantile(datosmodificados$track_popularity, 0.05)
   
-#View(cbind(datos$track_popularity,datos$target))
 ```
 
 
@@ -227,11 +236,7 @@ for (i in datosModificados$artist_genres) {
 
 }
 
-
-
 datosModificados$artist_genres <- as.factor(datosModificados$artist_genres)
-
-
 
 ```
 
@@ -279,13 +284,23 @@ datos_validation = datosModificados[-c(indices_test,indices_train),]
 
 Para comenzar con nuestro anánisis, lo primero que vamos a hacer es crear un Data Frame solo con las variables cuantitativas. Y por otro lado, uno con las variables continuas.
 
-```{r creacion dataframe de cuantitativos y continuos}
+```{r creacion dataframe de cuantitativos y continuos para los datos train}
 
-datosCuant = cbind( year = datos$year, track_popularity = datos$track_popularity, artist_popularity = datos$artist_popularity ,danceability = datos$danceability,energy = datos$energy,loudness = datos$loudness, speechiness = datos$speechiness,acousticness =  datos$acousticness, instrumentalness = datos$instrumentalness, liveness = datos$liveness,valence = datos$valence,tempo= datos$tempo,duration_ms = datos$duration_ms)
+datosCuant = cbind( year = datos$year, artist_popularity = datos$artist_popularity ,danceability = datos$danceability,energy = datos$energy,loudness = datos$loudness, speechiness = datos$speechiness,acousticness =  datos$acousticness, instrumentalness = datos$instrumentalness, liveness = datos$liveness,valence = datos$valence,tempo= datos$tempo,duration_ms = datos$duration_ms)
 
 datosCont = cbind( danceability = datos$danceability,energy = datos$energy,loudness = datos$loudness, speechiness = datos$speechiness,acousticness =  datos$acousticness, instrumentalness = datos$instrumentalness, liveness = datos$liveness,valence = datos$valence,tempo= datos$tempo,duration_ms = datos$duration_ms)
 
 ```
+
+
+```{r creacion dataframe de cuantitativos y continuos para los datos test}
+
+datosCuant_Test = cbind( year = datos_test$year, artist_popularity = datos_test$artist_popularity ,danceability = datos_test$danceability,energy = datos_test$energy,loudness = datos_test$loudness, speechiness = datos_test$speechiness,acousticness =  datos_test$acousticness, instrumentalness = datos_test$instrumentalness, liveness = datos_test$liveness,valence = datos_test$valence,tempo= datos_test$tempo,duration_ms = datos_test$duration_ms)
+
+datosCont_Test = cbind( danceability = datos_test$danceability,energy = datos_test$energy,loudness = datos_test$loudness, speechiness = datos_test$speechiness,acousticness =  datos_test$acousticness, instrumentalness = datos_test$instrumentalness, liveness = datos_test$liveness,valence = datos_test$valence,tempo= datos_test$tempo,duration_ms = datos_test$duration_ms)
+
+```
+
 
 
 Veamos una comparación general de todas nuestras variables cuantivas:
@@ -339,7 +354,7 @@ plot(datos$target, datos$instrumentalness)
 
 
 
-
+# 4. Estudio de PCA
 
 Vamos a hacer el estudio de PCA de las variables continuas, primero lo haremos con éstas escaladas y despues sin escalar, para ver si la diferencia nos infiere alguna conclusión.
 
@@ -379,7 +394,7 @@ Podemos considerar que la proporción acumulada a partir de PC4 (0.6) no aumenta
 
 
 
-```{r Elección de numero de clusters}
+```{r Elección de numero de clusters para escalados}
 #clusters2.datosCont = kmeans(datosContEscalados, centers=2, nstart=25)
 
 #Inicializamos el vector
@@ -436,7 +451,7 @@ Podemos considerar que la proporción acumulada a partir de PC4 (0.6) no aumenta
 
 
 
-```{r Elección de numero de clusters}
+```{r Elección de numero de clusters para no escalados}
 #Inicializamos el vector
 SSW2 <- vector(mode = "numeric", length = 15)
 
@@ -454,8 +469,11 @@ plot(1:15, SSW2, type="b", xlab="Number of Clusters", ylab="Sum of squares withi
 Se aprecia que a partir de 3 o 4 hay un "codo" por lo que nos vamos a quedar con 5 clusters.
 
 
+# 5. Técnicas de aprendizaje supervisado
 
-# Volvemos a los datos escalados para calcular los cluster
+## 5.1. Cluster
+
+### Volvemos a los datos escalados para calcular los cluster
 
 
 Calculamos los 5 cluster, para 25 casos y se queda con el mejor
@@ -530,13 +548,13 @@ clusters5.datosContEscalados_PCA <- clusters5.datosContEscalados$cluster
 # Vamos a hacer PCA para poder graficar los clusters en 2dimensiones!
 library(cluster)
 
-clusplot(datosContEscalados, clusters5.datosContEscalados_PCA, color=TRUE, shade=TRUE, labels=2,lines=0)
+clusplot(datosContEscalados, clusters5.datosContEscalados_PCA, color=TRUE, shade=TRUE, labels=6,lines=0)
 ```
 
 
 
 
-# Volvemos a los datos NO escalados para calcular los cluster
+### Volvemos a los datos NO escalados para calcular los cluster
 
 
 Calculamos los 3 cluster, para 25 casos y se queda con el mejor
@@ -579,7 +597,7 @@ points(clusters3.datosCont$centers, col = 1:nk, pch = 19, cex=2)
 Ahora lo hacemos con 4 clusters
 
 ```{r}
-# k-means para 6 grupos y 25 arranques diferentes
+# k-means para 4 grupos y 25 arranques diferentes
 
 clusters4.datosCont <- kmeans(datosCont, 4, nstart = 25)
 
@@ -603,15 +621,54 @@ Esto era representando los cluster con todos los datos.
 
 Ahora repetimos el proceso pero con las PCA.
 
-
-
 ```{r}
 # Guardamos el vector con el cluster correspondiente a cada país
 clusters4.datosCont_PCA <- clusters4.datosCont$cluster
 # Vamos a hacer PCA para poder graficar los clusters en 2dimensiones!
 library(cluster)
 
-clusplot(datosCont, clusters4.datosCont_PCA, color=TRUE, shade=TRUE, labels=2,lines=0)
+clusplot(datosCont, clusters4.datosCont_PCA, color=TRUE, shade=TRUE, labels=6,lines=0)
+```
+
+
+
+```{r PRUEBA PCA CLUSTER 2 a 2 DATOS ESCALADOS}
+
+clusters5.datosContEscalados_PCA <- clusters5.datosContEscalados$cluster
+# Seleccionamos las 4 primeras comp principales
+pca_escogidos <- analisisPCAEscalados$x[,1:4]
+# Agregamos la información del cluster
+pca_escogidos <- cbind(pca_escogidos, Cluster = clusters5.datosContEscalados_PCA)
+# Creamos los graficos de dispersión por pares
+pairs(pca_escogidos, col = clusters5.datosContEscalados_PCA, pch = 16)
+
+
+```
+
+Podemos observar que hay un cluster que está separado del resto.
+
+
+```{r PRUEBA PCA CLUSTER 2 a 2 DATOS SIN ESCALAR}
+clusters4.datosCont_PCA <- clusters4.datosCont$cluster
+pca_escogidos <- analisisPCA_NoEscalados$x[,1:4]
+pca_escogidos <- cbind(pca_escogidos, Cluster = clusters4.datosCont_PCA)
+pairs(pca_escogidos, col = clusters4.datosCont_PCA, pch = 16)
+
+```
+
+Para los datos no escalados los cluster no están muy definidos, a excepción de uno de los cluster que está diferenciado del resto.
+
+
+
+## 5.2. KNN
+
+```{r}
+KNN <- factor(datos$target, labels = c("0", "1", "2", "3"))
+n <- length(datosModificados$year)^((4)/(22+4)) # 23 es el numero de variables que tenemos
+modelo_KNN <- knn(train = datosCuant, test = datosCuant_Test, cl = KNN, k = n)
+
+table(modelo_KNN, datos_test$target)
+
 ```
 
 
@@ -619,14 +676,4 @@ clusplot(datosCont, clusters4.datosCont_PCA, color=TRUE, shade=TRUE, labels=2,li
 
 
 
-
-
-
-
-# Super hits?
-# Que artistas tienen mas popularidad, actuales o antiguos?
-# Canciones largas son superhists?
-# El instrumental o el nivel de sonido es importante?
-# Canciones con un nivel de sonido bajo es posible que sea un superhit?
-# Una cancion con poca danzabilidad puede ser superhit?
 
