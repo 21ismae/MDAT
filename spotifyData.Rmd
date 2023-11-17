@@ -695,15 +695,8 @@ set.seed(123) # semilla para estudiar siempre la misma combinación
 ```
 
 
-```{r Árbol de decisión 1}
-#datos.rp_cp1 <- rpart(datos[,23] ~., data=datos[,1:22], method="class", cp=0.0001, parms=list(split="information")) # cambiar si no information por gini
 
-#plotcp(datos.rp_cp1)
-#printcp(datos.rp_cp1)
-```
-
-
-```{r Árbol de decisión para 100 datos solo}
+```{r Árbol de decisión}
 library(rpart)
 
 # Seleccionar las primeras 20 filas para entrenar el modelo (ajusta según tus necesidades)
@@ -722,7 +715,17 @@ printcp(datos.rp_cp1)
 ```
 
 
+```{r Árbol de decisión por gini}
+library(rpart)
 
+# Ajustar el modelo de árbol de decisión
+# Puedes cambiar "information" a "gini" si prefieres el índice de Gini
 
+datos.rp_cp1 <- rpart(datos_train_SIN_IDs[,16] ~., data = datos_train_SIN_IDs[,1:15], method = "class", cp = 0.0001, parms = list(split = "gini"))
 
+# Visualizar la complejidad del árbol
+plotcp(datos.rp_cp1)
 
+# Mostrar información sobre la complejidad del árbol
+printcp(datos.rp_cp1)
+```
