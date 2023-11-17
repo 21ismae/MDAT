@@ -82,6 +82,7 @@ library(MASS)
 library(graphics)
 library(ellipse)   # Correlaciones
 library(class)
+library(rpart) # para árboles de decisión
 
 ```
 
@@ -185,6 +186,8 @@ Vamos a dividir nuestra variable objetivo (target) en 4 dependiendo de los cuant
 #quantile(datosModificados$track_popularity)
 
 datosModificados = datosModificados %>% mutate(target = if_else(track_popularity <= 54, 0, ifelse(54 < track_popularity  & track_popularity <= 72, 1, ifelse(track_popularity > 72 & track_popularity < 86, 2, 3 )))) #quantile(datosmodificados$track_popularity, 0.05)
+
+datosModificados = datosModificados[,-c(4)]
   
 ```
 
@@ -662,15 +665,61 @@ Para los datos no escalados los cluster no están muy definidos, a excepción de
 
 ## 5.2. KNN
 
-```{r}
+```{r KNN}
 KNN <- factor(datos$target, labels = c("0", "1", "2", "3"))
 n <- length(datosModificados$year)^((4)/(22+4)) # 23 es el numero de variables que tenemos
+n = round(n)
 modelo_KNN <- knn(train = datosCuant, test = datosCuant_Test, cl = KNN, k = n)
 
-table(modelo_KNN, datos_test$target)
+tablaKNN = table(modelo_KNN, datos_test$target)
+sum(diag(tablaKNN))/sum(tablaKNN)
 
+diag(tablaKNN)[1]/sum(tablaKNN)
+diag(tablaKNN)[2]/sum(tablaKNN)
+diag(tablaKNN)[3]/sum(tablaKNN)
+diag(tablaKNN)[4]/sum(tablaKNN)
 ```
 
+
+Hemos obtenido que hay poco acierto (menos del 50%), por lo que nuestro estudio con 4 clases en la variable target quizás es mejor reducirlo a 2 clases, puesto que además, en la clase 1 y la clase 4 obtenemos 0% de acierto.
+
+
+## 5.3 Arbol de decisión
+```{r Convertimos las variables cualitativas a factores, sólo de los datos train}
+datos[,2] = as.factor(datos[,2])
+datos[,3] = as.factor(datos[,3])
+datos[,5] = as.factor(datos[,5])
+datos[,6] = as.factor(datos[,6])
+datos[,7] = as.factor(datos[,7])
+set.seed(123) # semilla para estudiar siempre la misma combinación
+```
+
+
+```{r Árbol de decisión 1}
+#datos.rp_cp1 <- rpart(datos[,23] ~., data=datos[,1:22], method="class", cp=0.0001, parms=list(split="information")) # cambiar si no information por gini
+
+#plotcp(datos.rp_cp1)
+#printcp(datos.rp_cp1)
+```
+
+
+```{r Árbol de decisión para 100 datos solo}
+library(rpart)
+
+# Seleccionar las primeras 20 filas para entrenar el modelo (ajusta según tus necesidades)
+datos_train_SIN_IDs <- datos[,-c(1,2,3,4,6,5)]
+datos_train_100 <- head(datos_train_SIN_IDs, 200)
+
+# Ajustar el modelo de árbol de decisión
+# Puedes cambiar "information" a "gini" si prefieres el índice de Gini
+datos.rp_cp1 <- rpart(datos_train_100[,16] ~., data = datos_train_100[,1:15], method = "class", cp = 0.0001, parms = list(split = "information"))
+
+# Visualizar la complejidad del árbol
+plotcp(datos.rp_cp1)
+
+# Mostrar información sobre la complejidad del árbol
+printcp(datos.rp_cp1)
+```
 
 
 
