@@ -707,12 +707,12 @@ set.seed(123) # semilla para estudiar siempre la misma combinación
 library(rpart)
 
 # Seleccionar las primeras 20 filas para entrenar el modelo (ajusta según tus necesidades)
-datos_train_SIN_IDs <- datos[,-c(1,2,3,4,6,5)]
-datos_train_100 <- head(datos_train_SIN_IDs, 200)
+datos_train_SIN_IDs <- datos[,-c(1,2,3,4,6,5)] # y sin nombres de canciones, album, artistas...
 
 # Ajustar el modelo de árbol de decisión
 # Puedes cambiar "information" a "gini" si prefieres el índice de Gini
-datos.rp_cp1 <- rpart(datos_train_100[,16] ~., data = datos_train_100[,1:15], method = "class", cp = 0.0001, parms = list(split = "information"))
+
+datos.rp_cp1 <- rpart(datos_train_SIN_IDs[,16] ~., data = datos_train_SIN_IDs[,1:15], method = "class", cp = 0.0001, parms = list(split = "information"))
 
 # Visualizar la complejidad del árbol
 plotcp(datos.rp_cp1)
