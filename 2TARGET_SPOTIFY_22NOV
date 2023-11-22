@@ -680,6 +680,8 @@ diag(tablaKNN)[1]/sum(tablaKNN)
 diag(tablaKNN)[2]/sum(tablaKNN)
 diag(tablaKNN)[3]/sum(tablaKNN)
 diag(tablaKNN)[4]/sum(tablaKNN)
+
+datos_test[modelo_KNN==1,]
 ```
 
 
