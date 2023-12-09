@@ -1,0 +1,1241 @@
+---
+title: "SPOTIFY_2TARGET"
+output: html_document
+date: "2023-09-29"
+---
+
+
+Codigo modificado, hemos puesto 2 target (0 hasta 85 y 1 en adelante), obteniendo en KNN 5 falsos positivos y 1 acierto. CREEMOS QUE LA MEJOR ELECCION ES 84 O 85 . 22 de noviembre
+
+# 1. Business Understanding
+
+Este modelo se va a centrar en realizar un análisis de las canciones que han sido hit entre los años 2000-2022 en la plataforma de Spotify, con el objetivo de determinar qué canción será un hit de máxima popularidad.
+
+Preguntas que nos hacemos:
+
+#### Super hits?
+#### Que artistas tienen mas popularidad, actuales o antiguos?
+#### Canciones largas son superhists?
+#### El instrumental o el nivel de sonido es importante?
+#### Canciones con un nivel de sonido bajo es posible que sea un superhit?
+#### Una cancion con poca danzabilidad puede ser superhit?
+
+
+# 2. Data Understanding
+
+## 2.1. Descripción de los datos obtenidos de Spotify (Obtenidos via Kaggle)
+
+***Variables cualitativas*** 
+  
+  * playlist_url: dirección de la playlist que contiene los hits de cada año
+  
+  * track_id: id de la canción en Spotify
+  
+  * track_name: nombre de la canción
+  
+  * album: álbum al que pertenece la canción
+
+  * artist_id: id del artista que realiza la canción
+
+  * artist_genres: géneros musicales a los que está asociado el artista que realiza la canción
+  
+***Variables cuantitativas***
+
+  * year: año de la canción
+
+  * track_popularity: popularidad de la canción en una escala de 0-100
+
+  * artist_popularity: popularidad del artista de la canción en una escala de 0-100
+
+  * danceability: capacidad de una canción de ser bailable en escala de 0-1
+
+  * energy: medida en escala de 0-1 que representa una medida perceptual de la intensidad y actividad de la canción
+
+  * key: clave musical en la que se encuentra la canción, en notación estándar de las notas. Por ejemplo 0 = C, 1 = C♯/D♭, 2 = D
+
+  * loudness: volumen general de la canción medido en decibelios (dB)
+
+  * mode: modalidad (mayor o menor) de la canción. La modalidad "mayor" está representada por 1 y la modalidad "menor" por 0
+
+  * speechiness: presencia de palabras habladas en la canción respecto a la duración de esta, en escala de 0-1
+
+  * acousticness: medida de confianza en escala de 0-1 de la acústica de la canción
+
+  * instrumentalness: presencia de instrumentos en la canción respecto a la duración de esta, en escala de 0-1
+
+  * liveness: medida de la identificación de sonidos o señales que indican la existencia de un público o audiencia en la grabación musical de la canción
+
+  * valence: medida en escala de 0-1 que describe la positividad musical que transmite la canción
+
+  * tempo: velocidad y ritmo estimado de la canción en pulsaciones por minuto (BPM)
+
+  * duration_ms: duración de la canción en milisegundos
+
+  * time_signature: compás o ritmo estimado de la canción
+
+
+## 2.2. Paquetes importados
+
+```{r paquetes}
+library(dplyr)
+library(ggplot2)
+library(MASS)
+library(graphics)
+library(ellipse)   # Correlaciones
+library(class)
+library(rpart) # para árboles de decisión
+library(gridExtra)
+```
+
+
+## 2.3. Importación de datos
+
+```{r cargamos los datos}
+# Seleccion datos David:
+#"C:\\Users\\David\\Desktop\\MDAT\\playlist_2010to2022.csv"
+
+# Ruben:
+# "C:\\Users\\ruben_zbu59h5\\OneDrive\\Escritorio\\4º Matematicas\\Primer cuatri\\Mineria de Datos\\Trabajo\\MDAT\\playlist_2010to2022.csv"
+
+# Isma:
+#C:\\UNIVERSIDAD\\4º\\Minería de datos\\MDAT\\datos\\playlist_2010to2022.csv
+
+
+
+datosBase <- read.csv("C:\\Users\\David\\Desktop\\MDAT\\playlist_2010to2022.csv", sep=",", dec=".")
+```
+
+
+## 2.4. Limpiar datos
+
+Veamos cuantos valores NA tenemos, para buscar solución e interpretación de estos.
+
+```{r problema NA}
+sum(is.na(datosBase))
+which(is.na(datosBase)) #sacamos los NA
+#tenemos que eliminar la fila 448 (cancion: These Words , Unwritten)
+datosModificados = datosBase[-c(448), ]
+```
+
+Como solo teníamos una canción con sus variables NA, en cómputo queneral es algo que no está aportando nada ya que simplemente es un error o falta de información en la base de datos. Al ser mínimo, podemos poner la media de cada variable o simplemente quitarlo ya que no es significativo. Hemos optado por quitarlo.
+
+Vamos a eliminar también la variable url.
+
+```{r}
+datosModificados = datosModificados[,-1] # Eliminamos la primera columna de los datos (url playlist)
+```
+
+
+Quitamos esta variable, que incluye la url de la playlist, porque no aporta nada diferente a la variable que incluye los años en los que fueron hit las canciones, porque cada playlist es el top 100 canciones de un año.
+
+Veamos un pequeño resumen de nuestros datos (con un ejemplo de visualización):
+
+```{r}
+dim(datosModificados) # vemos las dimensiones de nuestros datos (numero de registros y variables)
+summary(datosModificados) # resumen de los datos por cada variable
+head(datosModificados) # Imprimimos algunos datos como ejemplo
+str(datosModificados)
+```
+
+
+Vamos a analizar a continuación si aparece alguna canción repetida.
+
+```{r quitar ids problema nombres por ser diferente año}
+frecuencia_nombres <- table(datosModificados$track_name)
+nombres_frecuencia_mayor_1 <- names(frecuencia_nombres[frecuencia_nombres > 1])
+# Muestra los nombres con frecuencia mayor que 1
+length(nombres_frecuencia_mayor_1)
+
+```
+
+
+Salen bastantes nombres repetidos, 168 concretamente, hemos visto que es porque aparecen varios años. Haciendo una investigación sobre la fuente, se debe a que estos hits se extraen de playlists creadas por Spotify de cada año. Por esa razón, si una canción aparece en la playlist de top hits 2021 y a la vez en la de 2022, la canción aparece 2 veces en la base de datos, solo con el año cambiado.
+
+
+
+## 2.5. Definición de la variable Target
+
+La variable target será la popularidad de la canción. Vamos a dividirla en dos clases, por un lado tendremos las canciones que presenten una popularidad menor de 85, denotadas con un "0". Por otro lado, tendremos las canciones con una popularidad mayor que 85, denotadas con un "1".
+
+```{r variable target}
+datosModificados = datosModificados %>% mutate(target = if_else(track_popularity < 84, 0, 1))
+datosModificados$target <- as.character(datosModificados$target)
+
+datosModificados = datosModificados[,-c(4)] # eliminamos la variable popularidad, ahora se llamará target
+```
+
+
+
+## 2.6. Filtrar géneros
+
+Debido a que la variable artist_genres nos da varios géneros en una misma variable cualitativa, vamos a quedarnos con el género más significativo para cada caso.
+
+Esto sería un trabajo a realizar junto a un experto en el tema, pero como no contamos con uno, lo que hemos hecho ha sido ver todos los géneros que aparecen y, tras previa búsqueda de información sobre cada género, hemos agrupado cada subgénero en su género principal.
+
+Además, hemos creado un género llamado 'Otros', donde se guardan los que NO pertenecen a alguno de los principales.
+
+Como dato a tener en cuenta, la mayoría de subgeneros se incluirían en Pop, ya que al ser una base de datos de hits, la propia definición de este género nos obligaría a meterlos, resultando en una pérdida importante de información. 
+
+Para solucionar esto, si cualquiera de los otros géneros aparece en esa observación, nos quedamos con el otro, en vez de coger siempre Pop. Todo esto es posible gracias a que estamos haciendo esta construcción mediante else-ifs.
+
+
+```{r filtro de generos}
+for (i in datosModificados$artist_genres) {
+  if( grepl("rap",i) ){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'rap'
+  }
+  else if( grepl("r&b",i) ||  grepl("soul",i) ){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'r&b'
+  }
+    else if( grepl("urban contemporary",i) ||  grepl("hop",i) || grepl("urbano latino",i) || grepl("reggaeton",i)  ){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'urban'
+    }
+    else if( grepl("metal",i) ){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'metal'
+      }
+  else if( grepl("rock",i) ){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'rock'
+      }
+  else if( grepl("edm",i) ||  grepl("trance",i) ||  grepl("electronica",i) ||  grepl("dance",i) ||  grepl("house",i)  || grepl("uk garage",i)){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'edm'
+  }
+  else if( grepl("uk pop",i) ){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'pop'
+  }
+  else if( grepl("k pop",i) ){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'pop'
+  }
+      else if ( grepl("country",i)){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'country'
+  }
+  else if ( grepl("pop",i) || grepl("boy band",i) || grepl("mellow",i)){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'pop'
+  }
+  else ( datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'otros')
+
+}
+
+datosModificados$artist_genres <- as.factor(datosModificados$artist_genres)
+```
+
+Veamos cómo quedan repartidos los géneros, para verificar que la separación realizada tiene algún sentido.
+
+```{r graficos generos}
+barplot(table(datosModificados$artist_genres))
+table(datosModificados$artist_genres)
+```
+
+
+## 2.7. Clasificación en Train, Test y Validación
+
+Dividimos los datos en diferentes tablas que utilizaremos para entrenar, hacer pruebas y validar resultado.
+
+```{r}
+set.seed(123) # definimos una semilla para que todas las elecciones aleatorias sean la misma en cualquier ejecución del código
+n_total= dim(datosModificados)[1]
+n_train = n_total * .5     # La mitad de los datos son para train
+n_test = n_total *.25      # 1/4 para probar
+
+indices_totales = seq(1:n_total)
+
+indices_train = sample(indices_totales, n_train)
+indices_test = sample(indices_totales[-indices_train],n_test)
+
+datos = datosModificados[indices_train,]    # Los datos de train, como son los más utilizados los llamamos datos
+datos_test = datosModificados[indices_test,]
+datos_validation = datosModificados[-c(indices_test,indices_train),]
+```
+
+
+Para comenzar con nuestro análisis, lo primero que vamos a hacer es crear un Data Frame solo con las variables cuantitativas. Y por otro lado, uno con las variables continuas.
+
+```{r creacion dataframe de cuantitativos y continuos para los datos train}
+
+datosCuant = cbind( year = datos$year, artist_popularity = datos$artist_popularity ,danceability = datos$danceability,energy = datos$energy,loudness = datos$loudness, speechiness = datos$speechiness,acousticness =  datos$acousticness, instrumentalness = datos$instrumentalness, liveness = datos$liveness,valence = datos$valence,tempo= datos$tempo,duration_ms = datos$duration_ms)
+
+datosCont = cbind( danceability = datos$danceability,energy = datos$energy,loudness = datos$loudness, speechiness = datos$speechiness,acousticness =  datos$acousticness, instrumentalness = datos$instrumentalness, liveness = datos$liveness,valence = datos$valence,tempo= datos$tempo,duration_ms = datos$duration_ms)
+
+
+
+```
+
+
+
+
+
+```{r creacion dataframe de cuantitativos y continuos para los datos test}
+
+datosCuant_Test = cbind( year = datos_test$year, artist_popularity = datos_test$artist_popularity ,danceability = datos_test$danceability,energy = datos_test$energy,loudness = datos_test$loudness, speechiness = datos_test$speechiness,acousticness =  datos_test$acousticness, instrumentalness = datos_test$instrumentalness, liveness = datos_test$liveness,valence = datos_test$valence,tempo= datos_test$tempo,duration_ms = datos_test$duration_ms)
+
+datosCont_Test = cbind( danceability = datos_test$danceability,energy = datos_test$energy,loudness = datos_test$loudness, speechiness = datos_test$speechiness,acousticness =  datos_test$acousticness, instrumentalness = datos_test$instrumentalness, liveness = datos_test$liveness,valence = datos_test$valence,tempo= datos_test$tempo,duration_ms = datos_test$duration_ms)
+
+```
+
+```{r validation continuas}
+datosContValidation = cbind( danceability = datos_validation$danceability,energy = datos_validation$energy,loudness = datos_validation$loudness, speechiness = datos_validation$speechiness,acousticness =  datos_validation$acousticness, instrumentalness = datos_validation$instrumentalness, liveness = datos_validation$liveness,valence = datos_validation$valence,tempo= datos_validation$tempo,duration_ms = datos_validation$duration_ms)
+
+
+```
+
+
+
+# 3. Analisis Exploratorio
+
+Vamos a comenzar con el análisis exploratorio de datos
+
+## 3.1. Algunas preguntas sobre los datos
+
+¿Cuál es la canción con una popularidad mayor?
+```{r Canción más popular}
+# Obtenemos la posición del dato más grande
+indice_max <- which.max(datosBase$track_popularity)
+# Obtener el dato más grande y su fila completa
+dato_maximo <- datosBase[indice_max, ]
+# Mostrar el resultado
+print(dato_maximo)
+```
+
+La canción más popular es Cruel Summer de Taylor Swift
+
+¿Cuál es el artista más popular?
+```{r Artista más popular}
+# Obtenemos la posición del dato más grande
+indice_max <- which.max(datosBase$artist_popularity)
+# Obtener el dato más grande y su fila completa
+dato_maximo <- datosBase[indice_max, ]
+# Mostrar el resultado
+print(dato_maximo$artist_name)
+```
+
+La artista más famosa es Taylor Swift
+
+¿Cuál es el álbum que más veces sale?
+```{r Album más popular}
+# frecuencia con la que aparece cada album
+frecuencias <- table(datosModificados$album)
+indice_max <- which.max(frecuencias)
+# Obtener el dato más grande y su fila completa
+dato_maximo <- datosBase[indice_max, ]
+# Mostrar el resultado
+print(indice_max)
+```
+
+
+## 3.2 Variable objetivo
+
+Vamos a ver cuántas observaciones salen de cada clase de la variable target, utilizando ya los datos train
+
+```{r}
+table(datos$target)
+```
+
+Obtenemos que 1055 canciones tendrán una popularidad menor de 85, y 94 canciones con una popularidad mayor o igual a 85.
+
+
+```{r}
+ggplot(data=datos,aes(x=target,fill=target)) +
+geom_bar(aes(y=(..count..)/sum(..count..))) +
+scale_y_continuous(labels=scales::percent) +
+theme(legend.position="none") +
+ylab("Frecuencaia relativa") +
+xlab("Variable respuesta: popularity")
+```
+
+## 3.3 Distribuciones de las variables 
+
+Género musical del artista
+
+```{r}
+datos%>%
+count(artist_genres)
+```
+
+
+Curva de densidad de la danzabilidad, energia, valencia y tempo
+
+```{r}
+grid.arrange(
+  ggplot(datos, aes(x=danceability)) + 
+    geom_histogram(aes(y=..density..),      
+                   binwidth=0.05,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666"),
+  
+  ggplot(datos, aes(x=energy)) + 
+    geom_histogram(aes(y=..density..),      
+                   binwidth=0.05,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666"),
+  
+  ggplot(datos, aes(x=valence)) + 
+    geom_histogram(aes(y=..density..),      
+                   binwidth=0.05,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666"),
+  
+    ggplot(datos, aes(x=tempo)) + 
+    geom_histogram(aes(y=..density..),      
+                   binwidth=10,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666"),
+  
+  ncol = 2  # Número de columnas en la cuadrícula
+)
+```
+
+
+Con estas distribuciones podemos observar que hay una tendencia hacia música con ritmo más alto en la muestra que tenemos. La variable tempo no se presenta una distribución normal tan marcada, si no que se centra en algunos valores más concretos (100, 120...)
+
+
+Podemos hacer la curva del resto de variables numéricas. Curva de densidad de , energia, valencia y tempo
+
+```{r}
+grid.arrange(
+  ggplot(datos, aes(x=artist_popularity)) + 
+    geom_histogram(aes(y=..density..),      
+                   binwidth=10,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666"),
+  
+  ggplot(datos, aes(x=key)) + 
+    geom_histogram(aes(y=..density..),      
+                   binwidth=1,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666"),
+  
+  ggplot(datos, aes(x=loudness)) + 
+    geom_histogram(aes(y=..density..),      
+                   binwidth=0.25,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666"),
+  
+  ggplot(datos, aes(x=mode)) + 
+    geom_histogram(aes(y=..density..),      
+                   binwidth=0.5,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666"),
+  
+  ggplot(datos, aes(x=speechiness)) + 
+    geom_histogram(aes(y=..density..),      
+                   binwidth=0.01,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666"),
+  
+  ggplot(datos, aes(x=acousticness)) + 
+    geom_histogram(aes(y=..density..),      
+                   binwidth=0.05,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666"),
+  
+  ggplot(datos, aes(x=liveness)) + 
+    geom_histogram(aes(y=..density..),      
+                   binwidth=0.05,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666"),
+  
+  ggplot(datos, aes(x=duration_ms)) + 
+    geom_histogram(aes(y=..density..),      
+                   binwidth=10000,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666"),
+  
+    ncol = 2  # Número de columnas en la cuadrícula
+)
+```
+
+
+
+## 3.4 Variable target
+
+Vamos a realizar también un box-plot de la variable target y la danzabilidad
+
+```{r}
+ggplot(datos, aes(x=target, y=danceability, color=target)) +
+geom_boxplot()
+```
+
+
+Vamos a realizar también un box-plot de la variable target y la energía
+
+```{r}
+ggplot(datos, aes(x=target, y=energy, color=target)) +
+geom_boxplot()
+```
+
+
+Vamos a realizar también un box-plot de la variable target y la valence
+
+```{r}
+ggplot(datos, aes(x=target, y=valence, color=target)) +
+geom_boxplot()
+```
+
+
+Vamos a realizar también un box-plot de la variable target y el tempo
+
+```{r}
+ggplot(datos, aes(x=target, y=tempo, color=target)) +
+geom_boxplot()
+```
+
+
+Vamos a realizar también un box-plot de la variable target y la duración
+
+```{r}
+ggplot(datos, aes(x=target, y=duration_ms, color=target)) +
+geom_boxplot()
+```
+
+Vamos a realizar también un box-plot de la variable target y el loudness
+
+```{r}
+ggplot(datos, aes(x=target, y=loudness, color=target)) +
+geom_boxplot()
+```
+
+
+
+## 3.5 Transformaciones de variables
+
+```{r}
+library(car)
+datos %>% symbox(~ tempo, data = .)
+```
+
+
+## 3.6 Correlación entre las variables
+
+Veamos la correlación existente entre las variables cuantitativas:
+
+```{r}
+cor(datosCuant)
+plotcorr(cor(datosCuant)) # cuanto mas se asemejen las figuras a una elipse mayor es la correlacion
+```
+
+En las variables que no son continuas (year y popularities) no podemos apreciar mucha correlación con las demás, por ello, veamos la correlación sólo entre las continuas:
+
+```{r}
+cor(datosCont)
+plotcorr(cor(datosCont)) # cuanto mas se asemejen las figuras a una elipse mayor es la correlacion
+```
+
+
+## 3.7 Comparación entre las variables
+
+Veamos una comparación general de todas nuestras variables cuantivas:
+
+```{r pair cuant}
+pairs(datosCuant)
+```
+
+Ahora, una comparación general de todas nuestras variables CONTINUAS:
+
+```{r pair cont}
+pairs(datosCont)
+```
+
+
+## 3.8 Comparación de las clases del target con variables numéricas
+
+Según la variable danceability
+
+```{r}
+ggplot(datos, aes(x = danceability, colour = target)) +
+geom_density(lwd=2, linetype=1)
+
+# Podemos ver un resumen de los datos según la variable danceability
+# Casos de popularidad 1
+summary(datos %>% filter(target=="1") %>% .$danceability)
+# Casos de popularidad 0
+summary(datos %>% filter(target=="0") %>% .$danceability)
+
+```
+
+
+Según la variable energy
+
+```{r}
+ggplot(datos, aes(x = energy, colour = target)) +
+geom_density(lwd=2, linetype=1)
+
+# Podemos ver un resumen de los datos según la variable energy
+# Casos de popularidad 1
+summary(datos %>% filter(target=="1") %>% .$energy)
+# Casos de popularidad 0
+summary(datos %>% filter(target=="0") %>% .$energy)
+```
+
+
+Según la variable valence
+
+```{r}
+ggplot(datos, aes(x = valence, colour = target)) +
+geom_density(lwd=2, linetype=1)
+
+# Podemos ver un resumen de los datos según la variable valence
+# Casos de popularidad 1
+summary(datos %>% filter(target=="1") %>% .$valence)
+# Casos de popularidad 0
+summary(datos %>% filter(target=="0") %>% .$valence)
+```
+
+
+Según la variable tempo
+
+```{r}
+ggplot(datos, aes(x = tempo, colour = target)) +
+geom_density(lwd=2, linetype=1)
+
+# Podemos ver un resumen de los datos según la variable tempo
+# Casos de popularidad 1
+summary(datos %>% filter(target=="1") %>% .$tempo)
+# Casos de popularidad 0
+summary(datos %>% filter(target=="0") %>% .$tempo)
+```
+
+
+Según la variable duration_ms
+
+```{r}
+ggplot(datos, aes(x = duration_ms, colour = target)) +
+geom_density(lwd=2, linetype=1)
+
+# Podemos ver un resumen de los datos según la variable danceability
+# Casos de popularidad 1
+summary(datos %>% filter(target=="1") %>% .$duration_ms)
+# Casos de popularidad 0
+summary(datos %>% filter(target=="0") %>% .$duration_ms)
+
+```
+
+
+Según la variable loudness
+
+```{r}
+ggplot(datos, aes(x = danceability, colour = target)) +
+geom_density(lwd=2, linetype=1)
+
+# Podemos ver un resumen de los datos según la variable danceability
+# Casos de popularidad 1
+summary(datos %>% filter(target=="1") %>% .$loudness)
+# Casos de popularidad 0
+summary(datos %>% filter(target=="0") %>% .$loudness)
+
+```
+
+
+
+Vamos a contrastar hipótesis también por medio del test t
+
+Este test tiene como hipótesis nula H0 que las medias de ambas clases de la variable target respecto a otra variable son iguales, mientras que la hipótesis alternativa H1 será que dichas medias son distintas. Se rechazará H0 cuando el p-valor asociado al test sea menor que 0.1.
+
+Para el caso de danceability podemos observar que sí hay diferencias significativas entre las medias de ambos grupos, se rechaza H0.
+
+```{r}
+t.test(danceability ~ target, data = datos)
+```
+
+Para el caso de energy podemos observar que sí hay diferencias significativas entre las medias de ambos grupos, se rechaza H0.
+
+```{r}
+t.test(energy ~ target, data = datos)
+```
+
+Para el caso de valence podemos observar que sí hay diferencias significativas entre las medias de ambos grupos, se rechaza H0.
+
+```{r}
+t.test(valence ~ target, data = datos)
+```
+
+Por último, para el caso del tempo podemos observar que las medias son muy similares, no se rechaza H0.
+
+```{r}
+t.test(tempo ~ target, data = datos)
+```
+
+Para el caso de duration_ms podemos observar que sí hay diferencias significativas entre las medias de ambos grupos, se rechaza H0.
+
+```{r}
+t.test(duration_ms ~ target, data = datos)
+```
+
+Para el caso de la loudness podemos observar que sí hay diferencias significativas entre las medias de ambos grupos, se rechaza H0.
+
+```{r}
+t.test(loudness ~ target, data = datos)
+```
+
+
+
+## 3.9 Comparación del target con variables categoricas
+
+Vamos a ver visualmente la cantidad de canciones con popularidad 0 y 1 hay por cada tipo de género musical en nuestros datos
+
+```{r}
+ggplot(data = datos, aes(x = artist_genres, fill = target)) +
+geom_bar()
+```
+
+```{r}
+data1=table(datos$artist_genres, datos$target)
+data1
+```
+
+
+
+Repetimos el proceso para analizarlo por año, viendo así que el año 2022 es el que presenta un mayor número de super hits.
+
+```{r}
+ggplot(data = datos, aes(x = year, fill = target)) +
+geom_bar()
+```
+
+```{r}
+data1=table(datos$year, datos$target)
+data1
+```
+
+
+## 3.10 Comparación de otras variables
+
+```{r}
+plot(datos$energy , datos$loudness)
+plot(datos$tempo , datos$danceability)
+
+
+plot( datos$target, datos$loudness)
+plot(datos$target, datos$danceability)
+plot(datos$target, datos$energy)
+plot(datos$target, datos$instrumentalness)
+
+```
+
+
+
+# 4. Estudio de PCA
+
+Vamos a hacer el estudio de PCA de las variables continuas, primero lo haremos con éstas escaladas y despues sin escalar, para ver si la diferencia nos infiere alguna conclusión.
+
+# Variables continuas ESCALADAS
+
+Primero escalamos los datos continuos
+
+```{r Creacion de datosContEscalados}
+
+datosContEscalados = scale(datosCont)
+n = dim(datosContEscalados)[1]
+p = dim(datosContEscalados)[2]
+
+datosCont_TestEscalados = scale(datosCont_Test)
+datosContValidationEscalados = scale(datosContValidation)
+```
+
+Una vez tenemos los datos escalados, hacemos un análisis de las componentes principales para éstos.
+
+
+```{r Analisis PCA para datos escalados}
+analisisPCAEscalados <- prcomp(datosContEscalados, scale= TRUE)
+
+cov(datosContEscalados)
+
+analisisPCAEscalados
+
+plot(prcomp(datosContEscalados))
+
+```
+
+Veamos la información acumulada que nos va aportando cada componente principal
+
+```{r}
+summary(analisisPCAEscalados)
+
+#hacer varias componentes principales incluyendo popularidad o no
+```
+
+
+Podemos considerar que la proporción acumulada a partir de PC4 (0.6) no aumenta de manera considerable y es un porcentaje suficientemente grande de explicabilidad de los datos.
+
+
+
+
+# 5. Técnicas de aprendizaje supervisado
+
+## 5.1. Cluster
+
+```{r Elección de numero de clusters para escalados}
+#clusters2.datosCont = kmeans(datosContEscalados, centers=2, nstart=25)
+
+#Inicializamos el vector
+SSW <- vector(mode = "numeric", length = 15)
+
+
+#Variabilidad de todos los datos, es decir, todos los datos como un único cluster
+SSW[1] <- (n - 1) * sum(apply(datosContEscalados,2,var)) 
+
+#Variabilidad de cada modelo, desde 2 clusters hasta 15 clusters
+for (i in 2:15) SSW[i] <- sum(kmeans(datosContEscalados,centers=i,nstart=25)$withinss)
+
+
+
+#Dibujamos un gráfico con el resultado
+plot(1:15, SSW, type="b", xlab="Number of Clusters", ylab="Sum of squares within groups",pch=19, col="steelblue4")
+
+```
+
+Se aprecia que a partir de 5 o 6 hay un "codo" por lo que nos vamos a quedar con 5 clusters.
+
+
+# Variables continuas NO ESCALADAS
+
+Veamos que si no hubiesemos escalado los datos, los resultados cambiarian, pero únicamente los de la elección del número de clusters, el resto de datos (PCA) son idénticos.
+
+```{r }
+nCont = dim(datosCont)[1]
+pCont = dim(datosCont)[2]
+```
+
+Análisis de las componentes principales para los datos sin escalar.
+
+
+```{r}
+analisisPCA_NoEscalados <- prcomp(datosCont, scale= TRUE)
+
+cov(datosCont)
+
+analisisPCA_NoEscalados
+
+plot(prcomp(datosCont))
+
+```
+
+Veamos la información acumulada que nos va aportando cada componente principal
+
+```{r}
+summary(analisisPCA_NoEscalados)
+
+#hacer varias componentes principales incluyendo popularidad o no
+```
+
+
+Podemos considerar que la proporción acumulada a partir de PC4 (0.6) no aumenta de manera considerable y es un porcentaje suficientemente grande de explicabilidad de los datos.
+
+
+
+```{r Elección de numero de clusters para no escalados}
+#Inicializamos el vector
+SSW2 <- vector(mode = "numeric", length = 15)
+
+#Variabilidad de todos los datos, es decir, todos los datos como un único cluster
+SSW2[1] <- (n - 1) * sum(apply(datosCont,2,var)) 
+
+#Variabilidad de cada modelo, desde 2 clusters hasta 15 clusters
+for (i in 2:15) SSW2[i] <- sum(kmeans(datosCont,centers=i,nstart=25)$withinss)
+
+#Dibujamos un gráfico con el resultado
+plot(1:15, SSW2, type="b", xlab="Number of Clusters", ylab="Sum of squares within groups",pch=19, col="steelblue4")
+
+```
+
+Se aprecia que a partir de 3 o 4 hay un "codo" por lo que nos vamos a quedar con 5 clusters.
+
+
+Calculamos los 5 cluster, para 25 casos y se queda con el mejor
+                   
+```{r}
+# k-means para 5 grupos y 25 arranques diferentes
+
+clusters5.datosContEscalados <- kmeans(datosContEscalados, 5, nstart = 25)
+
+clusters5.datosContEscalados
+
+```
+
+Podemos ver en la ejecución anterior a que cluster pertenece cada observación.
+
+Ahora veamos cuales son los centroides
+
+```{r}
+centroides = aggregate(datosContEscalados,by=list(clusters5.datosContEscalados$cluster),FUN=mean)
+
+t(centroides)
+```
+
+Por ejemplo, para el cluster 1 y la variable danceability, el centroide es 0.20288349
+
+
+
+Ahora representamos los cluster
+
+```{r}
+# Dibujamos los clusters en el scatterplot (variables 2a2)
+
+nk=5 # nk es el numero de clusters 
+pairs(datosContEscalados, col= clusters5.datosContEscalados$cluster,pch=19)
+
+points(clusters5.datosContEscalados$centers, col = 1:nk, pch = 19, cex=2)
+
+```
+
+
+Ahora lo hacemos con 6 clusters
+
+```{r}
+# k-means para 6 grupos y 25 arranques diferentes
+
+clusters6.datosContEscalados <- kmeans(datosContEscalados, 6, nstart = 25)
+
+clusters6.datosContEscalados
+
+centroides = aggregate(datosContEscalados,by=list(clusters6.datosContEscalados$cluster),FUN=mean)
+
+t(centroides)
+
+# Dibujamos los clusters en el scatterplot (variables 2a2)
+
+nk=6 # nk es el numero de clusters 
+pairs(datosContEscalados, col= clusters6.datosContEscalados$cluster,pch=19)
+
+points(clusters6.datosContEscalados$centers, col = 1:nk, pch = 19, cex=2)
+
+
+```
+
+Esto era representando los cluster con todos los datos.
+
+Ahora repetimos el proceso pero con las PCA.
+
+
+
+```{r}
+# Guardamos el vector con el cluster correspondiente a cada país
+clusters5.datosContEscalados_PCA <- clusters5.datosContEscalados$cluster
+# Vamos a hacer PCA para poder graficar los clusters en 2dimensiones!
+library(cluster)
+
+clusplot(datosContEscalados, clusters5.datosContEscalados_PCA, color=TRUE, shade=TRUE, labels=6,lines=0)
+```
+
+
+
+
+### Volvemos a los datos NO escalados para calcular los cluster
+
+
+Calculamos los 3 cluster, para 25 casos y se queda con el mejor
+                   
+```{r}
+# k-means para 5 grupos y 25 arranques diferentes
+
+clusters3.datosCont <- kmeans(datosCont, 5, nstart = 25)
+
+clusters3.datosCont
+
+```
+
+Podemos ver en la ejecución anterior a que cluster pertenece cada observación.
+
+Ahora veamos cuales son los centroides
+
+```{r}
+centroides = aggregate(datosCont,by=list(clusters3.datosCont$cluster),FUN=mean)
+
+t(centroides)
+```
+
+Por ejemplo, para el cluster 1 y la variable danceability, el centroide es 0.20288349
+
+
+Ahora representamos los cluster
+
+```{r}
+# Dibujamos los clusters en el scatterplot (variables 2a2)
+
+nk=3 # nk es el numero de clusters 
+pairs(datosCont, col= clusters3.datosCont$cluster,pch=19)
+
+points(clusters3.datosCont$centers, col = 1:nk, pch = 19, cex=2)
+
+```
+
+
+Ahora lo hacemos con 4 clusters
+
+```{r}
+# k-means para 4 grupos y 25 arranques diferentes
+
+clusters4.datosCont <- kmeans(datosCont, 4, nstart = 25)
+
+clusters4.datosCont
+
+centroides = aggregate(datosCont,by=list(clusters4.datosCont$cluster),FUN=mean)
+
+t(centroides)
+
+# Dibujamos los clusters en el scatterplot (variables 2a2)
+
+nk=4 # nk es el numero de clusters 
+pairs(datosCont, col= clusters4.datosCont$cluster,pch=19)
+
+points(clusters4.datosCont$centers, col = 1:nk, pch = 19, cex=2)
+
+
+```
+
+Esto era representando los cluster con todos los datos.
+
+Ahora repetimos el proceso pero con las PCA.
+
+```{r}
+# Guardamos el vector con el cluster correspondiente a cada país
+clusters4.datosCont_PCA <- clusters4.datosCont$cluster
+# Vamos a hacer PCA para poder graficar los clusters en 2dimensiones!
+library(cluster)
+
+clusplot(datosCont, clusters4.datosCont_PCA, color=TRUE, shade=TRUE, labels=6,lines=0)
+```
+
+
+
+```{r PRUEBA PCA CLUSTER 2 a 2 DATOS ESCALADOS}
+
+clusters5.datosContEscalados_PCA <- clusters5.datosContEscalados$cluster
+# Seleccionamos las 4 primeras comp principales
+pca_escogidos <- analisisPCAEscalados$x[,1:4]
+# Agregamos la información del cluster
+pca_escogidos <- cbind(pca_escogidos, Cluster = clusters5.datosContEscalados_PCA)
+# Creamos los graficos de dispersión por pares
+pairs(pca_escogidos, col = clusters5.datosContEscalados_PCA, pch = 16)
+
+
+```
+
+Podemos observar que hay un cluster que está separado del resto.
+
+
+```{r PRUEBA PCA CLUSTER 2 a 2 DATOS SIN ESCALAR}
+clusters4.datosCont_PCA <- clusters4.datosCont$cluster
+pca_escogidos <- analisisPCA_NoEscalados$x[,1:4]
+pca_escogidos <- cbind(pca_escogidos, Cluster = clusters4.datosCont_PCA)
+pairs(pca_escogidos, col = clusters4.datosCont_PCA, pch = 16)
+
+```
+
+Para los datos no escalados los cluster no están muy definidos, a excepción de uno de los cluster que está diferenciado del resto.
+
+
+
+## 5.2. KNN
+
+```{r KNN}
+
+KNN <- factor(datos$target, labels = c("0", "1"))
+n <- length(datosModificados$year)^((4)/(22+4)) # 23 es el numero de variables que tenemos
+n = round(n)
+modelo_KNN <- knn(train = datosCuant, test = datosCuant_Test, cl = KNN, k = n)
+
+tablaKNN = table(modelo_KNN, datos_test$target)
+sum(diag(tablaKNN))/sum(tablaKNN)
+
+diag(tablaKNN)[1]/sum(tablaKNN)
+diag(tablaKNN)[2]/sum(tablaKNN)
+diag(tablaKNN)[3]/sum(tablaKNN)
+diag(tablaKNN)[4]/sum(tablaKNN)
+
+datos_test[modelo_KNN==1,]
+```
+
+
+Hemos obtenido que hay poco acierto (menos del 50%), por lo que nuestro estudio con 4 clases en la variable target quizás es mejor reducirlo a 2 clases, puesto que además, en la clase 1 y la clase 4 obtenemos 0% de acierto.
+
+
+## 5.3 Arbol de decisión
+```{r Convertimos las variables cualitativas a factores, sólo de los datos train}
+datos[,2] = as.factor(datos[,2])
+datos[,3] = as.factor(datos[,3])
+datos[,5] = as.factor(datos[,5])
+datos[,6] = as.factor(datos[,6])
+datos[,7] = as.factor(datos[,7])
+set.seed(123) # semilla para estudiar siempre la misma combinación
+```
+
+
+
+```{r Árbol de decisión}
+library(rpart)
+
+# Seleccionar las primeras 20 filas para entrenar el modelo (ajusta según tus necesidades)
+datos_train_SIN_IDs <- datos[,-c(1,2,3,4,6,5)] # y sin nombres de canciones, album, artistas...
+
+# Ajustar el modelo de árbol de decisión
+# Puedes cambiar "information" a "gini" si prefieres el índice de Gini
+
+datos.rp_cp1 <- rpart(datos_train_SIN_IDs[,16] ~., data = datos_train_SIN_IDs[,1:15], method = "class", cp = 0.0001, parms = list(split = "information"))
+
+# Visualizar la complejidad del árbol
+plotcp(datos.rp_cp1)
+
+# Mostrar información sobre la complejidad del árbol
+printcp(datos.rp_cp1)
+```
+
+
+```{r Árbol de decisión por gini}
+library(rpart)
+
+# Ajustar el modelo de árbol de decisión
+# Puedes cambiar "information" a "gini" si prefieres el índice de Gini
+
+datos.rp_cp1 <- rpart(datos_train_SIN_IDs[,16] ~., data = datos_train_SIN_IDs[,1:15], method = "class", cp = 0.0001, parms = list(split = "gini"))
+
+# Visualizar la complejidad del árbol
+plotcp(datos.rp_cp1)
+
+# Mostrar información sobre la complejidad del árbol
+printcp(datos.rp_cp1)
+```
+
+
+```{r bosqueArbol continuos}
+set.seed(200)
+
+continuasEscaladas.rf <- randomForest(datosContEscalados, as.factor(datos[,22]), ntree = 20, importance=FALSE, proximity = TRUE, mtry=4,replace=TRUE )
+
+y.pred.test.rf <- predict(continuasEscaladas.rf, datosCont_TestEscalados)
+
+table.libreria.test = table(y.pred.test.rf, as.factor(datos_test[,22]))
+
+y.pred.train.rf = predict(continuasEscaladas.rf, datosContEscalados)
+
+table.libreria.train = table(y.pred.train.rf , as.factor(datos[,22]))
+
+print(table.libreria.test)
+
+print(table.libreria.train)
+
+
+``` 
+
+```{r svm}
+library(e1071)
+datos_train_x= datosContEscalados
+datos_train_y= datos_train_SIN_IDs[,16]
+svm = svm(datos_train_x, datos_train_y, type="C-classification", kernel="radial", scale=T)
+svm
+```
+
+
+
+```{r prediccionSVM}
+prediccion_SVM = predict(svm, datos_train_x)
+tabla_pred_SVM = table(prediccion_SVM, datos_train_y)
+tabla_pred_SVM
+
+```
+
+```{r prediccionSVMtest}
+datos_test_x= datosCont_TestEscalados
+datos_test_y= datos_test[,22]
+prediccion_SVM_test = predict(svm, datos_test_x)
+tabla_pred_SVM_test=table(prediccion_SVM_test, datos_test_y)
+tabla_pred_SVM_test
+
+```
+# nuevo : 
+
+
+```{r svm train}
+library(e1071)
+
+datos_train_x= datosContEscalados
+datos_train_y= datos_train_SIN_IDs[,16]
+
+
+gamma_est = 1/apply(datos_train_x, 2, sd)
+
+
+norma2 = function(x) sqrt(sum(x^2))
+cost_est = apply(datos_train_x, 2, norma2)
+```
+
+
+```{r svm prediccion con train radial} 
+spotify.svm1 = svm(datos_train_x, datos_train_y, type="C-classification", kernel="radial", gamma=mean(gamma_est), cost=mean(cost_est), scale=F)
+#linear , polynomial , sigmoid
+pred1 = predict(spotify.svm1, datos_train_x)
+table(pred1, datos_train_y)
+```
+
+```{r svm prediccion con test}
+set.seed(200)
+datos_test_x= datosCont_TestEscalados
+datos_test_y= datos_test[,22]
+pred2 = predict(spotify.svm1, datos_test_x)
+table(pred2, datos_test_y)
+```
+
+
+
+```{r tune.svm con validation }
+
+parametros = tune.svm(datosContValidationEscalados, as.factor(datos_validation[,22]), gamma = seq(0.5,2.5,by=0.5), cost = seq(10,90,by=20))
+
+attributes(parametros)
+
+iris.svm2 = svm(datosContValidationEscalados, datos_validation[,22], type="C-classification", kernel="radial", gamma= parametros$best.parameters[1], cost= parametros$best.parameters[2], scale=F)
+
+
+pred3 = predict(iris.svm2, datosCont_TestEscalados)
+table(pred3, datos_test[,22])
+
+pred4 = predict(iris.svm2, datosContEscalados)
+table(pred4, datos[,22])
+
+```
+
+
+
+
+
+```{r svm prediccion con train linear} 
+spotify.svm1.linear = svm(datos_train_x, datos_train_y, type="C-classification", kernel="linear", gamma=mean(gamma_est), cost=mean(cost_est), scale=F)
+#linear , polynomial , sigmoid
+pred.linear = predict(spotify.svm1.linear, datos_train_x)
+table(pred.linear, datos_train_y)
+```
+
+```{r svm prediccion con test}
+set.seed(200)
+datos_test_x= datosCont_TestEscalados
+datos_test_y= datos_test[,22]
+pred2.linear = predict(spotify.svm1.linear, datos_test_x)
+table(pred2.linear, datos_test_y)
+```
+
+
+```{r glm }
+logit2 <- glm( as.numeric(datos[,22]) ~ ., data = data.frame(datosContEscalados), family="binomial")
+
+summary(logit2)
+
+predicciones <- predict(logit2, type="response")
+hist(predicciones)
+library(caret)
+
+# Suponiendo que "predicciones" es el vector de predicciones y "bank.train" es tu conjunto de datos de entrenamiento
+
+clase.pred <- factor(ifelse(predicciones > 0.1, "yes", "no"), levels = levels(as.factor(datos[,22])))
+
+conf_matrix <- confusionMatrix(data = as.factor(clase.pred),reference = as.factor(datos[,22]),positive = "yes")
+
+# Mostrar la matriz de confusión
+conf_matrix
+
+
+```
+
+
+
+# preguntar sobre las medidas 
+# preguntar si estan bien el random forest , el svm y la regresion logistica (glm)
+
+
