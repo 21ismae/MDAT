@@ -1,0 +1,26 @@
+
+
+## 5.3 Arbol de decisión
+
+
+Un árbol de decisión es un modelo de aprendizaje supervisado utilizado en machine learning y minería de datos. Este modelo toma decisiones basadas en reglas lógicas que se aprenden a partir de los datos de entrenamiento. El árbol se construye dividiendo el conjunto de datos en subconjuntos más pequeños basándose en características particulares, de manera que la toma de decisiones se realiza siguiendo un camino desde la raíz hasta las hojas del árbol. Para nuestro caso vamos a hacer el árbol de decisión con las variables numéricas y el género de la canción ( en forma de factor), probaremos con el criterio information y gini :
+
+```{r Convertimos las variables cualitativas a factores, sólo de los datos train, echo=FALSE}
+datos[,2] = as.factor(datos[,2])
+datos[,3] = as.factor(datos[,3])
+datos[,5] = as.factor(datos[,5])
+datos[,6] = as.factor(datos[,6])
+datos[,7] = as.factor(datos[,7])
+set.seed(123) # semilla para estudiar siempre la misma combinación
+```
+
+
+
+```{r Árbol de decisión, echo=FALSE}
+library(rpart)
+datos_train_SIN_IDs <- datos[,-c(1,2,3,4,6,5)]
+datos_train_SIN_IDs <- cbind(datos_train_SIN_IDs[,1] , as.data.frame(scale(datos_train_SIN_IDs[,2:15])),datos_train_SIN_IDs[,16])
+datos.rp_cp1 <- rpart(datos_train_SIN_IDs[,16] ~., data = as.data.frame(datosContEscalados), method = "class", cp = 0.001, parms = list(split = "information"))
+plotcp(datos.rp_cp1)
+printcp(datos.rp_cp1)
+```
