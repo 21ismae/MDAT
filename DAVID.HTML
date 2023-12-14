@@ -24,3 +24,105 @@ datos.rp_cp1 <- rpart(datos_train_SIN_IDs[,16] ~., data = as.data.frame(datosCon
 plotcp(datos.rp_cp1)
 printcp(datos.rp_cp1)
 ```
+
+
+
+```{r Árbol de decisión por gini, echo=FALSE}
+library(rpart)
+datos.rp_cp1 <- rpart(datos_train_SIN_IDs[,16] ~., data = as.data.frame(datosContEscalados), method = "class", cp = 0.01, parms = list(split = "gini"))
+plotcp(datos.rp_cp1)
+printcp(datos.rp_cp1)
+
+-1.702101*sd(datos$duration_ms)+ mean(datos$duration_ms)
+```
+
+
+#Random forest
+
+Random Forest, es un conjunto de árboles de decisión. En lugar de depender de la decisión de un solo árbol, Random Forest promedia las decisiones de varios árboles para mejorar la precisión y la generalización del modelo.
+
+```{r bosqueArbol continuos, echo=FALSE}
+#set.seed(133)
+set.seed(200)
+
+continuasEscaladas.rf <- randomForest(datosContEscalados, as.factor(datos[,22]), ntree = 20, importance=FALSE, proximity = TRUE, mtry=4,replace=TRUE )
+
+y.pred.test.rf <- predict(continuasEscaladas.rf, datosCont_TestEscalados)
+
+table.libreria.test = table(y.pred.test.rf, as.factor(datos_test[,22]))
+
+y.pred.train.rf = predict(continuasEscaladas.rf, datosContEscalados)
+
+table.libreria.train = table(y.pred.train.rf , as.factor(datos[,22]))
+
+print(table.libreria.test)
+
+print(table.libreria.train)
+
+``` 
+Utilizando el random forest hemos obtenido una prediccion sobre test en la cual 3 de cada 7 canciones son predicciones acertadas de éxito. 
+
+
+#Suport Vector Machine
+
+Las Máquinas de Vectores de Soporte (SVM, por sus siglas en inglés: Support Vector Machines) son un tipo de algoritmo de aprendizaje supervisado utilizado para tareas de clasificación y regresión. SVM se destaca por su eficacia en espacios de alta dimensionalidad y su capacidad para separar clases no lineales mediante el uso de funciones llamadas "kernels".
+
+
+
+
+```{r svm train ,echo=FALSE}
+library(e1071)
+
+datos_train_x= datosContEscalados
+datos_train_y= datos_train_SIN_IDs[,16]
+
+
+gamma_est = 1/apply(datos_train_x, 2, sd)
+
+
+norma2 = function(x) sqrt(sum(x^2))
+cost_est = apply(datos_train_x, 2, norma2)
+```
+
+
+```{r svm prediccion con train radial ,echo=FALSE} 
+spotify.svm1 = svm(datos_train_x, datos_train_y, type="C-classification", kernel="radial", gamma=mean(gamma_est), cost=mean(cost_est), scale=F)
+#linear , polynomial , sigmoid
+pred1 = predict(spotify.svm1, datos_train_x)
+table(pred1, datos_train_y)
+```
+
+```{r svm prediccion con test ,echo=FALSE}
+set.seed(200)
+datos_test_x= datosCont_TestEscalados
+datos_test_y= datos_test[,22]
+pred2 = predict(spotify.svm1, datos_test_x)
+table(pred2, datos_test_y)
+```
+
+Con svm hemos obtenido 9 aciertos de 21 canciones seleecionadas en test. Se han probado diversos parametros y hemos obtenido el mejor resultado con el kernel radial.
+ 
+
+
+
+
+
+#Generalized linear Model
+
+Los Modelos Lineales Generalizados (GLM, por sus siglas en inglés: Generalized Linear Models) son una extensión de los modelos lineales tradicionales que permiten la modelización de relaciones entre variables de respuesta y predictores, incluso cuando la distribución de los errores no sigue la distribución normal.
+
+
+```{r glm , echo=FALSE}
+logit2 <- glm( as.numeric(datos[,22]) ~ ., data = data.frame(datosContEscalados), family="binomial")
+
+summary(logit2)
+
+predicciones <- predict(logit2, type="response")
+hist(predicciones)
+
+
+```
+
+
+
+
