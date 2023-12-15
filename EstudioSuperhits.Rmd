@@ -1,0 +1,862 @@
+---
+title: "Estudio de 'Super-Hits' (Spotify)"
+
+author: "David Arenas, Rubén Jiménez e Ismael Jiménez"
+
+date: "2023-12-22"
+output: 
+  bookdown::html_document2:
+    css: styles.css
+    toc: true  # Incluye tabla de contenidos automática
+    toc_float: true  # Mantener ToC visible a la izquierda
+    toc_depth: 2  # Incluir dos niveles de profundidad en ToC
+    number_sections: true  # Autonumerado de secciones
+    theme: sandstone  # Tema Bootstrap a emplear, 
+                  # se puede elegir entre las opciones por defecto de Bootstrap:
+                  # default, cerulean, journal, flatly, readable, spacelab, 
+                  # united, cosmo, lumen, paper, sandstone, simplex, and yeti
+    code_folding: hide  # Oculta el código de R, incluye un botón para mostrarlo
+                        # u ocultarlo
+    df_print: paged  # Utiliza paged para mostrar mejor las tablas de datos
+    fig_width: 7  # Anchura por defecto de las graficas (en pulgadas)
+    fig_height: 5  # Altura por defecto de las gráficas (en pulgadas)
+    fig_caption: true
+---
+
+
+# Business Understanding
+
+Este modelo se va a centrar en realizar un análisis de las canciones que han sido hit entre los años 2000-2022 en la plataforma de Spotify, con el objetivo de determinar qué canción será un hit de máxima popularidad.
+
+Hemos obtenido los datos a partir de la web "kaggle". En este caso tenemos 2300 observaciones, que las canciones, con sus respectivas variables (23 en total).
+
+Preguntas que nos hacemos:
+
+***¿Que canciones son Super-Hit?***
+(Entendemos Super-Hit como un Hit de máxima popularidad, ya que en nuestros datos sólo tenemos Hits)
+
+***¿Que artistas tienen mas popularidad, actuales o antiguos? ¿Influye para determinar la popularidad de la canción?***
+
+***¿Las canciones más largas son superhits?***
+
+***¿La instrumentalidad o energía son importantes?***
+
+***¿Las canciones con un nivel de discurso bajo pueden ser un superhit?***
+
+***¿Una canción con poca danzabilidad será superhit?***
+
+
+# Data Understanding
+
+## Descripción de los datos obtenidos de Spotify
+
+***Variables cualitativas*** 
+  
+  * playlist_url: dirección de la playlist que contiene los hits de cada año
+  
+  * track_id: id de la canción en Spotify
+  
+  * track_name: nombre de la canción
+  
+  * album: álbum al que pertenece la canción
+
+  * artist_id: id del artista que realiza la canción
+
+  * artist_genres: géneros musicales a los que está asociado el artista que realiza la canción
+  
+***Variables cuantitativas***
+
+  * year: año de la canción
+
+  * track_popularity: popularidad de la canción en una escala de 0-100
+
+  * artist_popularity: popularidad del artista de la canción en una escala de 0-100
+
+  * danceability: capacidad de una canción de ser bailable en escala de 0-1
+
+  * energy: medida en escala de 0-1 que representa una medida perceptual de la intensidad y actividad de la canción
+
+  * key: clave musical en la que se encuentra la canción, en notación estándar de las notas. Por ejemplo 0 = C, 1 = C♯/D♭, 2 = D
+
+  * loudness: volumen general de la canción medido en decibelios (dB)
+
+  * mode: modalidad (mayor o menor) de la canción. La modalidad "mayor" está representada por 1 y la modalidad "menor" por 0
+
+  * speechiness: presencia de palabras habladas en la canción respecto a la duración de esta, en escala de 0-1
+
+  * acousticness: medida de confianza en escala de 0-1 de la acústica de la canción
+
+  * instrumentalness: presencia de instrumentos en la canción respecto a la duración de esta, en escala de 0-1
+
+  * liveness: medida de la identificación de sonidos o señales que indican la existencia de un público o audiencia en la grabación musical de la canción
+
+  * valence: medida en escala de 0-1 que describe la positividad musical que transmite la canción
+
+  * tempo: velocidad y ritmo estimado de la canción en pulsaciones por minuto (BPM)
+
+  * duration_ms: duración de la canción en milisegundos
+
+  * time_signature: compás o ritmo estimado de la canción
+  
+  
+Observación: Hay variables porcentuales expresadas en escala 0-100, y otras en 0-1
+
+
+## Paquetes importados
+
+```{r paquetes, warning=FALSE}
+library(dplyr)
+library(ggplot2)
+library(MASS)
+library(graphics)
+library(ellipse)   # Correlaciones
+library(corrplot)
+library(class)
+library(rpart) # para árboles de decisión
+library(gridExtra)
+```
+
+
+## Importación de datos
+
+```{r cargamos los datos}
+# Seleccion datos David:
+#"C:\\Users\\David\\Desktop\\MDAT\\playlist_2010to2022.csv"
+
+# Ruben:
+# "C:\\Users\\ruben_zbu59h5\\OneDrive\\Escritorio\\4º Matematicas\\Primer cuatri\\Mineria de Datos\\Trabajo\\MDAT\\playlist_2010to2022.csv"
+
+# Isma:
+# C:\\UNIVERSIDAD\\4º\\Minería de datos\\MDAT\\playlist_2010to2022.csv
+
+
+
+datosBase <- read.csv("C:\\UNIVERSIDAD\\4º\\Minería de datos\\MDAT\\playlist_2010to2022.csv", sep=",", dec=".")
+```
+
+
+## Limpiar datos
+
+
+Primero veamos cuantos **valores NA** tenemos, para buscar una solución e interpretación de estos.
+
+```{r problema NA}
+sum(is.na(datosBase))
+which(is.na(datosBase)) #sacamos los NA
+#tenemos que eliminar la fila 448 (cancion: These Words , Unwritten)
+datosModificados = datosBase[-c(448), ]
+```
+
+Como solo teníamos **UNA canción** con sus 13 de sus variables NA, en cómputo general es algo que no está aportando nada ya que simplemente es un error o falta de información en la base de datos. Al ser mínimo, podemos poner la media de cada variable o simplemente quitarlo ya que no es significativo. En nuestro caso hemos optado por quitarlo.
+
+Vamos a eliminar también la **variable url**, ya que es un dato innecesario que dificultará nuestro estudio. Simplemente nos indicaba de qué playlist ha sido obtenida la canción, lo cual no aporta nada, puesto que son playlist creadas tras el éxito de la canción. En algunos casos ni siquiera son playlist oficiales.
+
+```{r}
+datosModificados = datosModificados[,-1] # Eliminamos la primera columna de los datos (url playlist)
+```
+
+
+
+Veamos un pequeño **resumen de nuestros datos**, para saber la dimensión exacta de nuestros datos, de qué tipo son cada uno y datos como la media, los cuantiles, el máximo o el mínimo.
+
+```{r}
+cat("Número de observaciones:", dim(datosModificados)[1], "\n")
+cat("Número de variables:", dim(datosModificados)[2], "\n")
+summary(datosModificados) # resumen de los datos por cada variable
+
+```
+
+A continuación un **ejemplo de visualización** y el **tipo de datos**:
+
+```{r}
+head(datosModificados) # Imprimimos algunos datos como ejemplo
+str(datosModificados)
+```
+
+
+Vamos a analizar a continuación si aparecen **canciones repetidas**.
+
+```{r quitar ids problema nombres por ser diferente año}
+frecuencia_nombres <- table(datosModificados$track_name)
+nombres_frecuencia_mayor_1 <- names(frecuencia_nombres[frecuencia_nombres > 1])
+# Muestra los nombres con frecuencia mayor que 1
+length(nombres_frecuencia_mayor_1)
+
+```
+
+
+Salen bastantes nombres repetidos, 168 concretamente, hemos visto que es porque aparecen varios años. Haciendo una investigación sobre la fuente, se debe a que estos hits se extraen de playlists creadas por Spotify de cada año. Por esa razón, si una canción aparece en la playlist de top hits 2021 y a la vez en la de 2022, la canción aparece 2 veces en la base de datos, solo con el año cambiado.
+
+Consideramos que es interesante como dato ya que si aparece en años diferentes es porque la canción ha tenido un éxito duradero.
+
+
+
+## Definición de la variable Target
+
+La variable target será la **popularidad de la canción**. Vamos a dividirla en **dos clases**, por un lado tendremos las canciones que presenten una  **popularidad menor de 88**, denotadas con un "0". Por otro lado, tendremos las canciones con una  **popularidad mayor que 88**, denotadas con un "1".
+
+En un principio, se nos ocurrió dividirlo en 4 clases en vez de 2, pero durante el desarrollo del estudio, llegamos a la conclusión de que la mejor opción era rebajar el número de clases, ya que dos de ellas no estaban aportando información y además aumentaban el tiempo de procesamiento, conllevando la imposibilidad de obtener conclusiones en algunos casos.
+
+
+Además, nuestra variable target será de tipo character, ya que nos es útil a la hora de graficarla en el análisis exploratorio.
+
+
+```{r variable target}
+datosModificados = datosModificados %>% mutate(target = if_else(track_popularity < 88, 0, 1))
+datosModificados$target <- as.character(datosModificados$target)
+
+datosModificados = datosModificados[,-c(4)] # eliminamos la variable popularidad, ahora se llamará target
+```
+
+Tras crear la variable target, podemos **descartar la de popularidad**, para no tener información repetida sobre la variable objetivo.
+
+
+## Filtrar géneros
+
+Debido a que la  **variable artist_genres** nos da varios géneros en una misma variable cualitativa, vamos a quedarnos con el género más significativo para cada caso.
+
+Veamos un ejemplo de lo que queremos modificar:
+
+```{r ejemplo de variable generos sin modificar}
+print(datosModificados$artist_genres[2])
+```
+
+
+Esto sería un trabajo a realizar junto a un experto en el tema, pero como no contamos con uno, lo que hemos hecho ha sido ver todos los géneros que aparecen y, tras previa búsqueda de información sobre cada género, hemos agrupado cada subgénero en su género principal.
+
+Además, hemos creado un género llamado **'Otros'**, donde se guardan los que NO pertenecen a alguno de los principales.
+
+Como dato a tener en cuenta, la mayoría de subgéneros se incluirían en Pop, ya que al ser una base de datos de hits, la propia definición de este género nos obligaría a meterlos, resultando en una pérdida importante de información. 
+
+Para solucionar esto, si cualquiera de los otros géneros aparece en esa observación, nos quedamos con el género más concreto, en vez de coger siempre Pop. Todo esto es posible gracias a que estamos haciendo esta construcción mediante else-ifs.
+
+
+```{r filtro de generos}
+for (i in datosModificados$artist_genres) {
+  if( grepl("rap",i) ){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'rap'
+  }
+  else if( grepl("r&b",i) ||  grepl("soul",i) ){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'r&b'
+  }
+    else if( grepl("urban contemporary",i) ||  grepl("hop",i) || grepl("urbano latino",i) || grepl("reggaeton",i)  ){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'urban'
+    }
+    else if( grepl("metal",i) ){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'metal'
+      }
+  else if( grepl("rock",i) ){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'rock'
+      }
+  else if( grepl("edm",i) ||  grepl("trance",i) ||  grepl("electronica",i) ||  grepl("dance",i) ||  grepl("house",i)  || grepl("uk garage",i)){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'edm'
+  }
+  else if ( grepl("country",i)){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'country'
+  }
+  else if( grepl("uk pop",i) ){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'pop'
+  }
+  else if( grepl("k pop",i) ){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'pop'
+  }
+  else if ( grepl("pop",i) || grepl("boy band",i) || grepl("mellow",i)){
+    datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'pop'
+  }
+  else ( datosModificados$artist_genres[datosModificados$artist_genres == i] <- 'otros')
+
+}
+
+datosModificados$artist_genres <- as.factor(datosModificados$artist_genres)
+```
+
+Veamos cómo quedan repartidos los géneros, para verificar que la separación realizada tiene sentido.
+
+**Gráfico de observaciones de cada género**
+
+```{r graficos generos}
+barplot(table(datosModificados$artist_genres))
+table(datosModificados$artist_genres)
+```
+
+Es una distribución que a priori parece realista en el contexto actual, por lo que puede ser una buena aproximación, útil para el estudio que queremos realizar. Sin embargo, recalcamos de nuevo, la mejor manera de obtener estos géneros habría sido tras ser informados por un experto.
+
+## Clasificación en Train, Test y Validación
+
+Imponemos una **semilla** para que la elección de los datos sean los mismos cada vez que ejecutemos el programa, de esta manera quedará una memoria más explicada.
+
+```{r seed}
+set.seed(123) # definimos una semilla para que todas las elecciones aleatorias sean la misma en cualquier ejecución del código
+```
+
+
+Por otro lado dividimos los datos en diferentes tablas que utilizaremos para entrenar, hacer pruebas y validar resultado.
+
+Usaremos la **mitad de los datos para entrenar**, un **25% para test** y el restante **25% para la validación**.
+
+
+```{r}
+n_total= dim(datosModificados)[1]
+n_train = n_total * .5     # La mitad de los datos son para train
+n_test = n_total *.25      # 1/4 para probar
+
+indices_totales = seq(1:n_total)
+
+indices_train = sample(indices_totales, n_train)
+indices_test = sample(indices_totales[-indices_train],n_test)
+
+datos = datosModificados[indices_train,]    # Los datos de train, como son los más utilizados los llamamos datos
+datos_test = datosModificados[indices_test,]
+datos_validation = datosModificados[-c(indices_test,indices_train),]
+```
+
+
+Para comenzar con nuestro análisis, lo primero que vamos a hacer es crear un **Data Frame** solo con las **variables cuantitativas**. Y por otro lado, uno con las **variables continuas**.
+
+(Lo hacemos para los 3 conjuntos de datos, Train, Test y Validation)
+
+```{r creacion dataframe de cuantitativos y continuos para los datos train}
+
+datosCuant = cbind( year = datos$year, artist_popularity = datos$artist_popularity ,danceability = datos$danceability,energy = datos$energy,loudness = datos$loudness, speechiness = datos$speechiness,acousticness =  datos$acousticness, instrumentalness = datos$instrumentalness, liveness = datos$liveness,valence = datos$valence,tempo= datos$tempo,duration_ms = datos$duration_ms)
+
+datosCont = cbind( danceability = datos$danceability,energy = datos$energy,loudness = datos$loudness, speechiness = datos$speechiness,acousticness =  datos$acousticness, instrumentalness = datos$instrumentalness, liveness = datos$liveness,valence = datos$valence,tempo= datos$tempo,duration_ms = datos$duration_ms)
+
+
+
+```
+
+
+```{r creacion dataframe de cuantitativos y continuos para los datos test}
+
+datosCuant_Test = cbind( year = datos_test$year, artist_popularity = datos_test$artist_popularity ,danceability = datos_test$danceability,energy = datos_test$energy,loudness = datos_test$loudness, speechiness = datos_test$speechiness,acousticness =  datos_test$acousticness, instrumentalness = datos_test$instrumentalness, liveness = datos_test$liveness,valence = datos_test$valence,tempo= datos_test$tempo,duration_ms = datos_test$duration_ms)
+
+datosCont_Test = cbind( danceability = datos_test$danceability,energy = datos_test$energy,loudness = datos_test$loudness, speechiness = datos_test$speechiness,acousticness =  datos_test$acousticness, instrumentalness = datos_test$instrumentalness, liveness = datos_test$liveness,valence = datos_test$valence,tempo= datos_test$tempo,duration_ms = datos_test$duration_ms)
+
+```
+
+```{r validation continuas}
+datosContValidation = cbind( danceability = datos_validation$danceability,energy = datos_validation$energy,loudness = datos_validation$loudness, speechiness = datos_validation$speechiness,acousticness =  datos_validation$acousticness, instrumentalness = datos_validation$instrumentalness, liveness = datos_validation$liveness,valence = datos_validation$valence,tempo= datos_validation$tempo,duration_ms = datos_validation$duration_ms)
+
+
+```
+
+
+
+# Analisis Exploratorio
+
+El análisis exploratorio de datos es un conjunto de técnicas utilizadas para
+examinar y comprender los patrones y relaciones en un conjunto de datos. Su objetivo principal es descubrir información importante y útil sobre los datos, antes de aplicar algoritmos de aprendizaje automático o modelos estadísticos.
+
+Por lo que vamos a comenzar con el análisis exploratorio de nuestros datos para conocerlos mejor.
+
+## Algunas preguntas sobre los datos
+
+***¿Cuál es la canción con una popularidad mayor?***
+```{r Canción más popular}
+# Obtenemos la posición del dato más grande
+indice_max <- which.max(datosBase$track_popularity)
+# Obtener el dato más grande y su fila completa
+dato_maximo <- datosBase[indice_max, ]
+# Mostrar el resultado
+print(dato_maximo$track_name)
+```
+
+La canción más popular es Cruel Summer de Taylor Swift.
+
+***¿Cuál es el artista más popular?***
+```{r Artista más popular}
+# Obtenemos la posición del dato más grande
+indice_max <- which.max(datosBase$artist_popularity)
+# Obtener el dato más grande y su fila completa
+dato_maximo <- datosBase[indice_max, ]
+# Mostrar el resultado
+print(dato_maximo$artist_name)
+```
+
+La artista más famosa también es Taylor Swift. 
+
+***¿Cuál es el álbum que más veces aparece?***
+```{r Album más popular}
+# frecuencia con la que aparece cada album
+frecuencias <- table(datosModificados$album)
+indice_max <- which.max(frecuencias)
+# Obtener el dato más grande y su fila completa
+dato_maximo <- datosBase[indice_max, ]
+# Mostrar el resultado
+print(indice_max)
+```
+
+El álbum 18 Months de Calvin Harris es el que más aparece, recordemos que esto puede ser debido a que aparecen muchas de sus canciones y/o sus canciones fueron populares durante distintos años.
+
+
+## Distribuciones de las variables 
+
+Veamos el número de apariciones de cada **género musical** del artista:
+
+```{r}
+datos%>%
+count(artist_genres)
+```
+
+Vemos que los géneros más comunes entre nuestros temas son Rap, pop, edm, r&b y rock, con una fuerte predominancia de los 3 primeros.
+(Es una observación que ya habíamos graficado cuando modificamos la variable para utilizar sólo el género principal)
+
+
+Estudiemos como se comporta la **curva de densidad** de la danzabilidad, energia, valencia y tempo:
+
+```{r}
+grid.arrange(
+  ggplot(datos, aes(x=danceability)) + 
+    geom_histogram(aes(y=..density..),      
+                   binwidth=0.05,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666"),
+  
+  ggplot(datos, aes(x=energy)) + 
+    geom_histogram(aes(y=..density..),      
+                   binwidth=0.05,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666"),
+  
+  ggplot(datos, aes(x=valence)) + 
+    geom_histogram(aes(y=..density..),      
+                   binwidth=0.05,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666"),
+  
+    ggplot(datos, aes(x=tempo)) + 
+    geom_histogram(aes(y=..density..),      
+                   binwidth=10,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666"),
+  
+  ncol = 2  # Número de columnas en la cuadrícula
+)
+```
+
+
+Con estas distribuciones podemos observar que hay una tendencia hacia música con energía y danzabilidad más altas (la distribución está centrada en valores superiores a 0.5)
+
+La variable tempo no se presenta una distribución normal tan marcada, pero se centra en algunos valores concretos (100, 120...).
+
+Por otro lado, la valencia es bastante más uniforme en comparación con el resto.
+
+
+Veamos la curva de **otras variables numéricas**:
+```{r}
+grid.arrange(
+  ggplot(datos, aes(x=artist_popularity)) + 
+    geom_histogram(aes(y=..density..),      
+                   binwidth=10,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666"),
+  
+  ggplot(datos, aes(x=key)) + 
+    geom_histogram(aes(y=..density..),      
+                   binwidth=1,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666"),
+  
+  ggplot(datos, aes(x=loudness)) + 
+    geom_histogram(aes(y=..density..),      
+                   binwidth=0.25,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666"),
+  
+  
+  ggplot(datos, aes(x=speechiness)) + 
+    geom_histogram(aes(y=..density..),      
+                   binwidth=0.01,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666"),
+  
+  ggplot(datos, aes(x=acousticness)) + 
+    geom_histogram(aes(y=..density..),      
+                   binwidth=0.05,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666"),
+  
+  ggplot(datos, aes(x=liveness)) + 
+    geom_histogram(aes(y=..density..),      
+                   binwidth=0.05,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666"),
+  
+  ggplot(datos, aes(x=duration_ms)) + 
+    geom_histogram(aes(y=..density..),      
+                   binwidth=10000,
+                   colour="black", fill="white") +
+    geom_density(alpha=.2, fill="#FF6666"),
+  
+    ncol = 2  # Número de columnas en la cuadrícula
+)
+```
+
+
+La popularidad del artista, loudness y duración siguen una distribución normal.
+
+Key es bastante uniforme.
+
+Y vemos también que speechiness, acousticness y liveness tienen sus observaciones muy concentradas en los valores más bajos.
+
+
+
+## Variable target
+
+Vamos a ver cuántas observaciones salen de cada clase de la variable target (ya utilizando los datos train)
+
+```{r}
+table(datos$target)
+```
+
+Esto significa que la mayoría de canciones tendrán una popularidad menor de 88 (tipo 0), y habrá muchas menos canciones una popularidad mayor o igual a 88 (tipo 1).
+
+Representación gráfica:
+
+```{r}
+ggplot(data=datos,aes(x=target,fill=target)) +
+geom_bar(aes(y=(..count..)/sum(..count..))) +
+scale_y_continuous(labels=scales::percent) +
+theme(legend.position="none") +
+ylab("Frecuencia relativa") +
+xlab("Variable respuesta: popularity")
+```
+
+Nos encontramos ante un problema de **datos DESBALANCEADOS**, que en general son más difíciles de tratar.
+
+### Target con variables numéricas
+
+Para hacer un estudio de como se comportan nuestros datos dependiendo de la clase del target a la que pertenezcan , vamos a utilizar Boxplots y graficas de las funciones de densidad.
+
+Vamos a utilizar los boxplot para estudiar si hay muchos valores atípicos (aquellos que quedan fuera de los bigotes) y si hay simetría.
+
+Junto a ellos tendremos las funciones de densidad de las variables, relacionadas con cada clase del target (al igual que los boxplots), es otra forma de ver esta información, que puede ayudar a entender mejor la distrbución.
+
+Además, en algunos casos contrastaremos hipótesis mediante el t-test.
+
+Este test tiene como hipótesis nula H0 que las medias de ambas clases de la variable target respecto a otra variable son iguales, mientras que la hipótesis alternativa H1 será que dichas medias son distintas. Se rechazará H0 cuando el p-valor asociado al test sea menor que 0.1.
+
+
+Realizamos un Box-Plot para danzabilidad y Target:
+
+```{r}
+ggplot(datos, aes(x = target, y = danceability, fill = target)) +
+  geom_boxplot() +
+  geom_text(aes(label = ifelse(danceability > quantile(danceability, 0.75) + 1.5 * IQR(danceability) | danceability < quantile(danceability, 0.25) - 1.5 * IQR(danceability), as.character(danceability), "")),
+            position = position_dodge(width = 0.75), vjust = -0.5) +
+  labs(title = "Boxplot danceability/target (con etiquetas de observaciones atípicas)") +
+  theme_minimal()
+
+
+```
+
+En este caso hemos etiquetado los puntos atipicos para ver (por ejemplo) que uno de los puntos atípicos en target 0 tiene danzabilidad 0.209.
+
+Veamos también la comparación de la función de densidad de danceability según el target:
+
+```{r}
+ggplot(datos, aes(x = danceability, colour = target)) +
+geom_density(lwd=2, linetype=1)
+```
+
+Vemos que las canciones más populares, en general tienen menor danzabilidad
+
+Resumen numérico de lo obtenido en la gráfica:
+```{r}
+# Podemos ver un resumen de los datos según la variable danceability
+# Casos de popularidad 1
+summary(datos %>% filter(target=="1") %>% .$danceability)
+# Casos de popularidad 0
+summary(datos %>% filter(target=="0") %>% .$danceability)
+```
+
+Para el caso de danceability podemos observar que sí hay diferencias significativas entre las medias de ambos grupos, se rechaza H0.
+
+Por lo que se cumple H1, las medias son distintas.
+
+```{r}
+t.test(danceability ~ target, data = datos)
+```
+
+
+Hacemos el mismo estudio para más variables:
+
+
+**box-plot / densidades de la variable target y la energía**
+
+```{r}
+boxplot <-ggplot(datos, aes(x=target, y=energy, color=target)) +
+geom_boxplot()
+
+# Densidades
+dens <- ggplot(datos, aes(x = energy, colour = target)) +
+geom_density(lwd=2, linetype=1)
+
+# Imprime los gráficos en paneles separados
+grid.arrange(boxplot, dens, ncol = 2)
+
+
+```
+
+Los valores de energy son mayoritariamente iguales en valores alrededor de 0.75, aunque hay repunte de canciones más populares (del target = 1), en bajos porcentajes de energía, mientras que hay pocas del target = 0 con poca energía.
+
+
+
+**box-plot / densidades de la variable target y la valence**
+
+```{r}
+boxplot <- ggplot(datos, aes(x=target, y=valence, color=target)) +
+geom_boxplot()
+
+# Densidades
+dens <- ggplot(datos, aes(x = valence, colour = target)) +
+geom_density(lwd=2, linetype=1)
+
+# Imprime los gráficos en paneles separados
+grid.arrange(boxplot, dens, ncol = 2)
+```
+
+En este caso no hay valores atípicos y la distribución es amplia.
+
+Para la valencia, las canciones menos populares (target 0) se concentran en los valores superiores, a pesar de ser bastante uniformes las dos funciones de densidad.
+
+Podemos observar que sí hay diferencias significativas entre las medias de ambos grupos, se rechaza H0.
+
+```{r}
+t.test(valence ~ target, data = datos)
+```
+
+**box-plot / densidades de la variable target y el tempo**
+
+```{r}
+boxplot<-ggplot(datos, aes(x=target, y=tempo, color=target)) +
+geom_boxplot()
+
+# Densidades
+dens <- ggplot(datos, aes(x = tempo, colour = target)) +
+geom_density(lwd=2, linetype=1)
+
+# Imprime los gráficos en paneles separados
+grid.arrange(boxplot, dens, ncol = 2)
+```
+
+Podemos ver que los tempos de 100 y 120 están más relacionados con menor popularidad.
+Los tempos entre 100 y 120 son más populares.
+
+Sin embargo, podemos observar que las medias son muy similares, no se rechaza H0.
+
+```{r}
+t.test(tempo ~ target, data = datos)
+```
+
+**box-plot de la variable target y la duración**
+
+```{r}
+ggplot(datos, aes(x=target, y=duration_ms, color=target)) +
+geom_boxplot()
+
+```
+
+**Gráfica densidades de la variable target y la duración**
+
+```{r}
+ggplot(datos, aes(x = duration_ms, colour = target)) +
+geom_density(lwd=2, linetype=1)
+```
+
+En este caso podemos apreciar levemente que las canciones más populares (target 1) suelen tener un poco menos de duración.
+
+**box-plot de la variable target y el artist popularity**
+
+```{r}
+
+
+boxplot<-ggplot(datos, aes(x=target, y=artist_popularity, color=target)) +
+geom_boxplot()
+
+# Densidades
+dens <- ggplot(datos, aes(x = artist_popularity, colour = target)) +
+geom_density(lwd=2, linetype=1)
+
+# Imprime los gráficos en paneles separados
+grid.arrange(boxplot, dens, ncol = 2)
+
+
+```
+
+
+En este último caso, apreciamos claramente que para las canciones más populares (target=1), lo más común es que la popularidad del artista sea muy alta. Sin embargo, para las otras canciones no queda tan marcado.
+
+SÍ hay diferencias significativas entre las medias de ambos grupos, se rechaza H0.
+
+```{r}
+t.test(loudness ~ target, data = datos)
+```
+
+
+Para las variables vistas, no hay valores atípicos en relación a los target = 1, sin embargo, para los target = 0 encontramos bastantes más. 
+
+Sin embargo, sabemos que cogiendo el target con la popularidad desde el 85, nos salía algún valor atípico para target = 1, pero siempre una cantidad mínima en comparación con los otros.
+
+Una de las razones por la que no salen practicamente valores atípicos, es que estamos en un problema de datos desbalanceados.
+
+### Target con variables categóricas
+
+Vamos a ver visualmente la **cantidad de canciones con popularidad 0 y 1 hay por cada tipo de género musical** en nuestros datos
+
+```{r}
+ggplot(data = datos, aes(x = artist_genres, fill = target)) +
+geom_bar()
+```
+
+Vemos que sobre todo hay popularidad de tipo 1 en los géneros pop, rap y edm. Si lo queremos ver más preciso, tenemos la siguiente tabla:
+
+```{r}
+data1=table(datos$artist_genres, datos$target)
+data1
+```
+
+
+
+Repetimos el proceso para analizarlo por **años**, viendo así que el año 2022 es el que presenta un mayor número de super hits.
+
+```{r}
+ggplot(data = datos, aes(x = year, fill = target)) +
+geom_bar()
+```
+
+Como ***observación*** interesante para futuros proyectos, relacionada con el estudio de datos desbalanceados, una forma de tratarlos podría ser agrupar las canciones del rango de años (2006-2012), ya que no tienen ninguna canción popular.
+
+```{r}
+data1=table(datos$year, datos$target)
+data1
+```
+
+
+## Escalado de los datos
+
+
+
+Sabemos que variables como instrumentalness y duration_ms son mucho más pequeñas que el resto de los datos. Incluso tenemos variables cuantitativas expresadas en términos porcentuales de (0-100), y otras de (0-1).
+
+Para solucionar esto, creamos data Frames con todos los datos escalados. De esta manera no tendremos problemas de pesos que aportan cada variable debido a que el tamaño en proporción de sus valores estará ya escalado.
+
+En apartados como por ejemplo el análisis de PCA (Sección 4), hacemos el análisis con datos escalados y no escalados para ver que ocurriría si no lo tuviesemos en cuenta.
+
+
+**Ejemplo de variable con datos SIN ESCALAR**
+
+```{r}
+plot(datos$instrumentalness , datos$speechiness)
+
+```
+
+**Escalamos los datos continuos**
+
+```{r Creacion de datosContEscalados}
+
+datosContEscalados = scale(datosCont)
+n = dim(datosContEscalados)[1]
+p = dim(datosContEscalados)[2]
+
+datosCont_TestEscalados = scale(datosCont_Test)
+datosContValidationEscalados = scale(datosContValidation)
+```
+
+
+**Ejemplo de variable con datos ESCALADOS**
+
+```{r}
+plot(datosContEscalados[, "instrumentalness"] , datosContEscalados[, "speechiness"])
+```
+
+
+Los datos quedan **igual de distribuidos** pero con valores que quedan en una **misma escala**.
+
+
+
+
+
+## Correlación entre las variables
+
+
+```{r, include=FALSE}
+cor(datosCuant)
+cor(datosCont)
+```
+
+Veamos la correlación existente entre las **variables cuantitativas**:
+
+```{r}
+corrplot(cor(datosCuant)) 
+```
+
+Vemos por ejemplo que entre las dos variables cualitativas (popularidad del artista y año) hay cierta correlación positiva.
+
+
+Ahora vamos a centrarnos únicamente en las **continuas**, que son las que explican cómo es la canción, es decir sus características mas "técnicas":
+
+```{r}
+corrplot(cor(datosCont)) 
+```
+
+Las variables más correlacionadas son **loudness-energy-acousticness**, lo cual puede tener sentido ya que son las que influyen en el ritmo y fuerza de la canción.
+
+
+
+## Comparación entre las variables
+
+Veamos una comparación general de todas nuestras **variables cuantivas**:
+
+```{r pair cuant}
+pairs(datosCuant)
+```
+
+La mayoría de estos emparejamientos no nos aporta información, por ser **demasiado dispersas**.
+
+Por ejemplo:
+
+**Gráfica Años-Valencia**
+
+```{r}
+plot(datos$year , datos$valence)
+```
+
+
+Ahora, una comparación general de todas nuestras **variables CONTINUAS**, que son las más correlacionadas:
+
+```{r pair cont}
+pairs(datosCont)
+```
+
+Vemos que loudness y energy son la que tienen la correlación más marcada, pero en general seguimos viendo facilmente que son gráficas de puntos muy dispersos.
+
+**Gráfica Energy-Loudness**
+
+```{r}
+plot(datos$energy , datos$loudness)
+```
+
+## Conclusión EDA
+
+Gracias al análisis exploratorio hemos obtenido información importante para conocer los datos.
+
+
+Conseguimos responder a preguntas concretas como las del 3.1, que nos ayudan a visualizar ejemplos de datos específicos importantes, como puede ser saber quién es la artista con más popularidad.
+
+Hemos comprobado que nuestro estudio es un caso de datos desbalanceados, lo cual tendrá mucha influencia en el resto del análisis.
+
+Además, hemos visto cuáles son las distribuciones de las variables y como se comportan según la clase de target en la que estén. Gracias a esto podemos empezar a intuir cuáles pueden tener importancia a la hora de decidir si una canción es superhit. Y en algunos casos, como el de la variable key, que tiene una distribución muy uniforme, ya podemos prácticamente afirmar que no van a influir tanto en la decisión.
+
+Saber por ejemplo que las canciones más populares suelen ser más cortas, puede ayudarnos a buscar la explicabilidad en algoritmos, como por ejemplo SVM.
+
+Por otro lado hemos confirmado que los artistas más populares suelen ser populares, algo que puede ser evidente, pero que gracias al análisis hemos podido comprobar.
+
+También sabemos que, a pesar de haber encontrado alguna correlación,  en general nuestras variables son poco correlacionadas, lo que complicará nuestro estudio.
+
+
+
+
+
+
+
