@@ -294,7 +294,13 @@ datosCuant = cbind( year = datos$year, artist_popularity = datos$artist_populari
 datosCont = cbind( danceability = datos$danceability,energy = datos$energy,loudness = datos$loudness, speechiness = datos$speechiness,acousticness =  datos$acousticness, instrumentalness = datos$instrumentalness, liveness = datos$liveness,valence = datos$valence,tempo= datos$tempo,duration_ms = datos$duration_ms)
 
 ```
+```{r creacion dataframe de cuantitativos y continuos para los datos validation, echo=FALSE}
 
+datosCuant_Validation = cbind( year = datos_validation$year, artist_popularity = datos_validation$artist_popularity ,danceability = datos_validation$danceability,energy = datos_validation$energy,loudness = datos_validation$loudness, speechiness = datos_validation$speechiness,acousticness =  datos_validation$acousticness, instrumentalness = datos_validation$instrumentalness, liveness = datos_validation$liveness,valence = datos_validation$valence,tempo= datos_validation$tempo,duration_ms = datos_validation$duration_ms)
+
+datosCont_Validation = cbind( danceability = datos_validation$danceability,energy = datos_validation$energy,loudness = datos_validation$loudness, speechiness = datos_validation$speechiness,acousticness =  datos_validation$acousticness, instrumentalness = datos_validation$instrumentalness, liveness = datos_validation$liveness,valence = datos_validation$valence,tempo= datos_validation$tempo,duration_ms = datos_validation$duration_ms)
+
+```
 
 ```{r creacion dataframe de cuantitativos y continuos para los datos test}
 
@@ -303,6 +309,8 @@ datosCuant_Test = cbind( year = datos_test$year, artist_popularity = datos_test$
 datosCont_Test = cbind( danceability = datos_test$danceability,energy = datos_test$energy,loudness = datos_test$loudness, speechiness = datos_test$speechiness,acousticness =  datos_test$acousticness, instrumentalness = datos_test$instrumentalness, liveness = datos_test$liveness,valence = datos_test$valence,tempo= datos_test$tempo,duration_ms = datos_test$duration_ms)
 
 ```
+
+
 
 
 
