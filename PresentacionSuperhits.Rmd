@@ -755,10 +755,10 @@ Vemos que loudness y energy son la que tienen la correlación más marcada, pero
 plot(datos$energy , datos$loudness)
 ```
 
+## Árbol de Decisión , Random Forest, SVM y GLM
 
 
-
-En este último apartado se han probado los modelos Random Forest, GLM y SVM , de estos tres modelos tan sólo hemos obtenido resultados favorables en SVM:
+En este último apartado se han probado los modelos Árbol de decisión, Random Forest, GLM y SVM , de estos tres modelos tan sólo hemos obtenido resultados favorables en SVM:
 
 
 
