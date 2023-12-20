@@ -755,6 +755,8 @@ Vemos que loudness y energy son la que tienen la correlación más marcada, pero
 plot(datos$energy , datos$loudness)
 ```
 
+
+___________________________________________PARTE DE DAVID_____________________
 ## Árbol de Decisión , Random Forest, SVM y GLM
 
 
