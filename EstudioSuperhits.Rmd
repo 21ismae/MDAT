@@ -856,7 +856,206 @@ También sabemos que, a pesar de haber encontrado alguna correlación,  en gener
 
 
 
+________________________APARTADO DAVID_______________________________________
 
+
+## 5.3 Arbol de decisión
+
+
+Un árbol de decisión es un modelo de aprendizaje supervisado utilizado en machine learning. Este modelo toma decisiones basadas en reglas lógicas a partir de los datos de entrenamiento. El árbol se construye dividiendo el conjunto de datos en subconjuntos más pequeños basados en características particulares, así, la toma de decisiones se realiza siguiendo un camino desde la raíz hasta las hojas del árbol. Para nuestro caso vamos a hacer el árbol de decisión con las variables numéricas y el género de la canción ( en forma de factor), probaremos con el criterio information y gini :
+
+```{r Convertimos las variables cualitativas a factores, sólo de los datos train, echo=FALSE}
+datos[,2] = as.factor(datos[,2])
+datos[,3] = as.factor(datos[,3])
+datos[,5] = as.factor(datos[,5])
+datos[,6] = as.factor(datos[,6])
+datos[,7] = as.factor(datos[,7])
+set.seed(123) # semilla para estudiar siempre la misma combinación
+```
+
+Árbol de decisión mediante "information" con cp = 0.01 :
+
+
+```{r Árbol de decisión, echo=FALSE}
+library(rpart)
+datos_train_SIN_IDs <- datos[,-c(1,2,3,4,6,5)]
+datos_train_SIN_IDs <- cbind(datos_train_SIN_IDs[,1] , as.data.frame(scale(datos_train_SIN_IDs[,2:15])),datos_train_SIN_IDs[,16])
+datos.rp_cp1.info <- rpart(datos_train_SIN_IDs[,16] ~., data = as.data.frame(datosContEscalados), method = "class", cp = 0.01, parms = list(split = "information"))
+plotcp(datos.rp_cp1.info)
+printcp(datos.rp_cp1.info)
+```
+
+Obtenemos un árbol que selecciona las variables: acousticness, danceability, duration_ms, loudness,     tempo.
+
+Árbol de decisión mediante "gini" con cp = 0.01 :
+
+
+```{r Árbol de decisión por gini, echo=FALSE}
+library(rpart)
+datos.rp_cp1.gini <- rpart(datos_train_SIN_IDs[,16] ~., data = as.data.frame(datosContEscalados), method = "class", cp = 0.01, parms = list(split = "gini"))
+plotcp(datos.rp_cp1.gini)
+printcp(datos.rp_cp1.gini)
+
+-1.702101*sd(datos$duration_ms)+ mean(datos$duration_ms)
+```
+
+Obtenemos un árbol que selecciona las variables: acousticness, danceability, tempo 
+
+En ambos árboles se seleccionan las variables acousticness, danceability, tempo  .
+
+```{r, echo=FALSE}
+set.seed(123)
+y.pred.test.rf <- predict(datos.rp_cp1.info, data.frame(datosCont_TestEscalados))
+columna <- matrix(1:574)
+for(i in 1:574){
+  if (y.pred.test.rf[i,1] > y.pred.test.rf[i,2]){columna[i] <- 0}
+  if (y.pred.test.rf[i,2] > y.pred.test.rf[i,1]){columna[i] <- 1}
+}
+
+table.libreria.test = table(columna, as.factor(datos_test[,22]))
+table.libreria.test
+
+```
+```{r , echo=FALSE}
+set.seed(123)
+datos.rp_cp1.gini <- predict(datos.rp_cp1, data.frame(datosCont_TestEscalados))
+columna <- matrix(1:574)
+for(i in 1:574){
+  if (y.pred.test.rf[i,1] > y.pred.test.rf[i,2]){columna[i] <- 0}
+  if (y.pred.test.rf[i,2] > y.pred.test.rf[i,1]){columna[i] <- 1}
+}
+
+table.libreria.test = table(columna, as.factor(datos_test[,22]))
+table.libreria.test
+
+
+```
+
+
+CONCLUSIONES DEL ARBOL DE DECICISON: Obtenemos un resultado de 3 canciones seleccionadas de 11 que son éxitosas en test.
+
+
+#Random forest
+
+Random Forest, es un conjunto de árboles de decisión. En lugar de depender de la decisión de un solo árbol, Random Forest promedia las decisiones de varios árboles para mejorar la precisión y la generalización del modelo.
+
+```{r bosqueArbol continuos, echo=FALSE}
+set.seed(133)
+#set.seed(200)
+
+continuasEscaladas.rf <- randomForest(datosContEscalados, as.factor(datos[,22]), ntree = 20, importance=FALSE, proximity = TRUE, mtry=4,replace=TRUE )
+
+y.pred.test.rf <- predict(continuasEscaladas.rf, datosCont_TestEscalados)
+
+table.libreria.test = table(y.pred.test.rf, as.factor(datos_test[,22]))
+
+y.pred.train.rf = predict(continuasEscaladas.rf, datosContEscalados)
+
+table.libreria.train = table(y.pred.train.rf , as.factor(datos[,22]))
+
+print(table.libreria.test)
+
+print(table.libreria.train)
+
+
+
+``` 
+
+Conclusiones Random Forest.
+Utilizando el random forest hemos obtenido una prediccion sobre test en la cual 1 de cada 14 canciones son predicciones acertadas de éxito. 
+
+
+#Suport Vector Machine
+
+Las Máquinas de Vectores de Soporte (SVM, por sus siglas en inglés: Support Vector Machines) son un tipo de algoritmo de aprendizaje supervisado utilizado para tareas de clasificación y regresión. SVM se destaca por su eficacia en espacios de alta dimensionalidad y su capacidad para separar clases no lineales mediante el uso de funciones llamadas "kernels".
+
+
+
+
+```{r svm train ,echo=FALSE}
+library(e1071)
+datos_train_x= datosContEscalados
+datos_train_y= datos_train_SIN_IDs[,16]
+gamma_est = 1/apply(datos_train_x, 2, sd)
+norma2 = function(x) sqrt(sum(x^2))
+cost_est = apply(datos_train_x, 2, norma2)
+```
+
+
+```{r svm prediccion con train radial ,echo=FALSE} 
+spotify.svm1 = svm(datos_train_x, datos_train_y, type="C-classification", kernel="radial", gamma=mean(gamma_est), cost=mean(cost_est), scale=F)
+pred1 = predict(spotify.svm1, datos_train_x)
+table(pred1, datos_train_y)
+```
+
+```{r svm prediccion con test ,echo=FALSE}
+datos_test_x= datosCont_TestEscalados
+datos_test_y= datos_test[,22]
+pred2 = predict(spotify.svm1, datos_test_x)
+#table(pred2, datos_test_y)
+library(caret)
+confusionMatrix(as.factor(pred2),as.factor(datos_test_y),positive = "1")
+```
+
+
+Conclusiones:
+Con svm hemos obtenido 5 aciertos de 13 canciones seleccionadas en test. Se han probado diversos parametros y hemos obtenido el mejor resultado con el kernel radial.
+ 
+
+
+Hemos observado que svm es un buen modelo en prediccion de canciones exitosas, asi que vamos a probar en validation: 
+
+```{r svm prediccion con validation ,echo=FALSE}
+datosCont_ValidationEscalados = scale(datosCont_Validation)
+
+datos_validation_x= datosCont_ValidationEscalados
+datos_validation_y= datos_validation[,22]
+pred3 = predict(spotify.svm1, datos_validation_x)
+library(caret)
+confusionMatrix(as.factor(pred3),as.factor(datos_validation_y),positive = "1")
+```
+
+Observamos que con validation obtenemos el 50% de predicciones acertadas aproximadamente, lo que confirma lo que hemos visto en svm cuando hemos probado con test.
+
+
+#Generalized linear Model
+
+Los Modelos Lineales Generalizados (GLM, por sus siglas en inglés: Generalized Linear Models) son una extensión de los modelos lineales tradicionales que permiten la modelización de relaciones entre variables de respuesta y predictores, incluso cuando la distribución de los errores no sigue la distribución normal.
+
+
+```{r glm , echo=FALSE}
+logit2 <- glm( as.numeric(datos[,22]) ~ ., data = data.frame(datosContEscalados), family = binomial(link = "logit"), )
+
+summary(logit2)
+
+predicciones <- predict(logit2, type="response")
+hist(predicciones)
+```
+
+
+```{r glm , echo=FALSE}
+datos.rp_cp1.gini <- predict(datos.rp_cp1, data.frame(datosCont_TestEscalados))
+columna <- matrix(1:574)
+for(i in 1:574){
+  if (y.pred.test.rf[i,1] > y.pred.test.rf[i,2]){columna[i] <- 0}
+  if (y.pred.test.rf[i,2] > y.pred.test.rf[i,1]){columna[i] <- 1}
+}
+
+table.libreria.test = table(columna, as.factor(datos_test[,22]))
+table.libreria.test
+
+```
+
+
+## TRABAJO DE CARA A FUTURO
+
+Como trabajo futuro para mejorar nuestro análisis podríamos utilizar métodos de balanceado que hemos descibrimiento recientemente en las siguientes páginas: 
+https://rpubs.com/Diego_Cortes/749267
+https://rpubs.com/oscarqpe/BalanceoDatos
+
+Utilizando estos métodos, se han reportado mejoras significativas en los datos, pudiendo pasar de un desbalanceo 98 - 2 % a 60 - 40 %, lo que es una mejora significativa ya que muchos de nuestros modelos no tienen en cuenta la variable minoritaria.
+
+También podíamos haber utilizado redes neuronales, o tratar de aumentar el número de variables Target a SuperExitosa, Exitosa, Medio (0,1,2) , o , ajustar el corte en el que decimos que una canción es SuperExitosa o no sin embargo no ha sido posible por la carga de trabajo. Aún así estamos contento con nuestros resultados, sobre todo el obtenido en SVM, en el que Validation (datos que el modelo nunca ha visto), ha logrado un acierto de canciones SuperExitosas del 50% aproximadamente.
 
 
 
