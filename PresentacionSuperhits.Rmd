@@ -758,4 +758,61 @@ plot(datos$energy , datos$loudness)
 
 
 
+En este último apartado se han probado los modelos Random Forest, GLM y SVM , de estos tres modelos tan sólo hemos obtenido resultados favorables en SVM:
 
+
+
+
+```{r svm train ,echo=FALSE}
+library(e1071)
+datos_train_x= datosContEscalados
+datos_train_y= datos_train_SIN_IDs[,16]
+gamma_est = 1/apply(datos_train_x, 2, sd)
+norma2 = function(x) sqrt(sum(x^2))
+cost_est = apply(datos_train_x, 2, norma2)
+```
+
+
+```{r svm prediccion con train radial ,echo=FALSE} 
+spotify.svm1 = svm(datos_train_x, datos_train_y, type="C-classification", kernel="radial", gamma=mean(gamma_est), cost=mean(cost_est), scale=F)
+pred1 = predict(spotify.svm1, datos_train_x)
+table(pred1, datos_train_y)
+```
+
+```{r svm prediccion con test ,echo=FALSE}
+datos_test_x= datosCont_TestEscalados
+datos_test_y= datos_test[,22]
+pred2 = predict(spotify.svm1, datos_test_x)
+#table(pred2, datos_test_y)
+library(caret)
+confusionMatrix(as.factor(pred2),as.factor(datos_test_y),positive = "1")
+```
+
+
+
+Con svm hemos obtenido 5 aciertos de 13 canciones seleccionadas en test. Se han probado diversos parametros y hemos obtenido el mejor resultado con el kernel radial.
+ 
+
+
+```{r svm prediccion con validation ,echo=FALSE}
+datosCont_ValidationEscalados = scale(datosCont_Validation)
+
+datos_validation_x= datosCont_ValidationEscalados
+datos_validation_y= datos_validation[,22]
+pred3 = predict(spotify.svm1, datos_validation_x)
+library(caret)
+confusionMatrix(as.factor(pred3),as.factor(datos_validation_y),positive = "1")
+```
+
+Tras probar con validation hemos observado que obtenemos el 50% de predicciones acertadas aproximadamente, lo que confirma lo que hemos visto en svm cuando hemos probado con test.
+
+
+## TRABAJO DE CARA A FUTURO
+
+Como trabajo futuro para mejorar nuestro análisis podríamos utilizar métodos de balanceado que hemos descibrimiento recientemente en las siguientes páginas: 
+https://rpubs.com/Diego_Cortes/749267
+https://rpubs.com/oscarqpe/BalanceoDatos
+
+Utilizando estos métodos, se han reportado mejoras significativas en los datos, pudiendo pasar de un desbalanceo 98 - 2 % a 60 - 40 %, lo que es una mejora significativa ya que muchos de nuestros modelos no tienen en cuenta la variable minoritaria.
+
+También podíamos haber utilizado redes neuronales, o tratar de aumentar el número de variables Target a SuperExitosa, Exitosa, Medio (0,1,2) , o , ajustar el corte en el que decimos que una canción es SuperExitosa o no sin embargo no ha sido posible por la carga de trabajo. Aún así estamos contento con nuestros resultados, sobre todo el obtenido en SVM, en el que Validation (datos que el modelo nunca ha visto), ha logrado un acierto de canciones SuperExitosas del 50% aproximadamente.
