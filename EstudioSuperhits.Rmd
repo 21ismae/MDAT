@@ -863,7 +863,7 @@ ________________________APARTADO DAVID_______________________________________
 
 
 Un árbol de decisión es un modelo de aprendizaje supervisado utilizado en machine learning. Este modelo toma decisiones basadas en reglas lógicas a partir de los datos de entrenamiento. El árbol se construye dividiendo el conjunto de datos en subconjuntos más pequeños basados en características particulares, así, la toma de decisiones se realiza siguiendo un camino desde la raíz hasta las hojas del árbol. Para nuestro caso vamos a hacer el árbol de decisión con las variables numéricas y el género de la canción ( en forma de factor), probaremos con el criterio information y gini :
-
+En primer lugar convertimos las variables cualitativas a factores en los datos train : 
 ```{r Convertimos las variables cualitativas a factores, sólo de los datos train, echo=FALSE}
 datos[,2] = as.factor(datos[,2])
 datos[,3] = as.factor(datos[,3])
@@ -896,7 +896,6 @@ datos.rp_cp1.gini <- rpart(datos_train_SIN_IDs[,16] ~., data = as.data.frame(dat
 plotcp(datos.rp_cp1.gini)
 printcp(datos.rp_cp1.gini)
 
--1.702101*sd(datos$duration_ms)+ mean(datos$duration_ms)
 ```
 
 Obtenemos un árbol que selecciona las variables: acousticness, danceability, tempo 
@@ -916,6 +915,7 @@ table.libreria.test = table(columna, as.factor(datos_test[,22]))
 table.libreria.test
 
 ```
+
 ```{r , echo=FALSE}
 set.seed(123)
 datos.rp_cp1.gini <- predict(datos.rp_cp1, data.frame(datosCont_TestEscalados))
@@ -932,12 +932,12 @@ table.libreria.test
 ```
 
 
-CONCLUSIONES DEL ARBOL DE DECICISON: Obtenemos un resultado de 3 canciones seleccionadas de 11 que son éxitosas en test.
+## CONCLUSIONES DEL ARBOL DE DECICISON: Obtenemos un resultado de 3 canciones seleccionadas de 11 que son éxitosas en test. No es un resultado extremadamente bueno, intetaremos mejorarlo con Random Forest.
 
 
 #Random forest
 
-Random Forest, es un conjunto de árboles de decisión. En lugar de depender de la decisión de un solo árbol, Random Forest promedia las decisiones de varios árboles para mejorar la precisión y la generalización del modelo.
+Random Forest, es un conjunto de árboles de decisión. En lugar de depender de la decisión de un solo árbol, Random Forest promedia las decisiones de varios árboles para mejorar la precisión del modelo.
 
 ```{r bosqueArbol continuos, echo=FALSE}
 set.seed(133)
@@ -961,8 +961,8 @@ print(table.libreria.train)
 
 ``` 
 
-Conclusiones Random Forest.
-Utilizando el random forest hemos obtenido una prediccion sobre test en la cual 1 de cada 14 canciones son predicciones acertadas de éxito. 
+## Conclusiones Random Forest.
+Utilizando el random forest hemos obtenido una prediccion sobre test en la cual 1 de cada 14 canciones son predicciones acertadas de éxito, esto no supone una mejora significativa respecto el arbol de decisión. 
 
 
 #Suport Vector Machine
@@ -998,11 +998,9 @@ confusionMatrix(as.factor(pred2),as.factor(datos_test_y),positive = "1")
 ```
 
 
-Conclusiones:
-Con svm hemos obtenido 5 aciertos de 13 canciones seleccionadas en test. Se han probado diversos parametros y hemos obtenido el mejor resultado con el kernel radial.
+## CONCLUSIONES SVM:
+Con svm hemos obtenido 5 aciertos de 13 canciones seleccionadas en test. Se han probado diversos parametros y hemos obtenido el mejor resultado con el kernel radial. Este resultado es de los mejores que hemos conseguido hasta ahora.
  
-
-
 Hemos observado que svm es un buen modelo en prediccion de canciones exitosas, asi que vamos a probar en validation: 
 
 ```{r svm prediccion con validation ,echo=FALSE}
@@ -1016,7 +1014,7 @@ confusionMatrix(as.factor(pred3),as.factor(datos_validation_y),positive = "1")
 ```
 
 Observamos que con validation obtenemos el 50% de predicciones acertadas aproximadamente, lo que confirma lo que hemos visto en svm cuando hemos probado con test.
-
+SVM es un buen modelo para predecir canciones SuperExitosas.
 
 #Generalized linear Model
 
@@ -1045,6 +1043,10 @@ table.libreria.test = table(columna, as.factor(datos_test[,22]))
 table.libreria.test
 
 ```
+
+## CONCLUSIONES GLM
+
+Observamos que un glm binomial no es una buena forma de predecir canciones SuperExitosas.
 
 
 ## TRABAJO DE CARA A FUTURO
