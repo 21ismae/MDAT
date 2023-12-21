@@ -755,8 +755,392 @@ Vemos que loudness y energy son la que tienen la correlación más marcada, pero
 plot(datos$energy , datos$loudness)
 ```
 
+# 4. Técnicas de reducción de la dimensionalidad
 
-___________________________________________PARTE DE DAVID_____________________
+
+## 4.1 Estudio de PCA
+
+Vamos a realizar el análisis de Componentes Principales (PCA) para las variables continuas. En primer lugar vamos a hacerlo para variables sin escalar y posteriormente para variables escaladas, para ver si las diferencias en los resultados nos infiere alguna conclusión.
+
+
+### 4.1.1 Variables continuas NO ESCALADAS
+
+En primer lugar analizamos la correlación entre las variables de nuestros datos.
+
+```{r Correlacion de variables continuas no escaladas}
+# En primer lugar calculamos la matriz de covarianzas
+#cov(datosCont)
+
+# Como a veces es dificil de interpretar la covarianza, calculamos la matriz de correlaciones
+cor(datosCont)
+```
+
+Podemos observar que existe alta relación entre las variables loudness y energy (0,699), y una relación considerable entre las variables danceability y valence (0,415) y entre energy y acousticness (-0,565). Entre el resto de variables la relación es muy probre.
+
+
+```{r PCA para no escalados, echo=FALSE}
+analisisPCA_NoEscalados <- prcomp(datosCont, scale= FALSE)
+# Vemos los resultados
+analisisPCA_NoEscalados
+```
+
+Calculamos las PCA y vemos la explicabilidad de cada componente.
+
+```{r}
+plot(prcomp(datosCont))
+```
+
+Vemos que el primer componente explica el 100% de la variabilidad de los datos y, por tanto, decidimos escalarlos y repetir el proceso.
+
+
+```{r, echo=FALSE}
+summary(analisisPCA_NoEscalados)
+```
+
+
+```{r, echo=FALSE}
+analisisPCA_NoEscalados
+```
+
+Gráficamente vemos la influencia de la variable duración.
+
+```{r, echo=FALSE}
+biplot(prcomp(datosCont_Test))
+```
+
+Tras esto vamos a repetir el proceso para escalados.
+
+### 4.1.2 Variables continuas ESCALADAS
+
+```{r Analisis PCA para datos escalados, echo=FALSE}
+analisisPCAEscalados <- prcomp(datosContEscalados, scale= TRUE)
+
+analisisPCAEscalados
+```
+
+Vemos gráficamente la explicabilidad de cada componente.
+
+```{r}
+plot(prcomp(datosContEscalados))
+```
+
+Se observa que ya todas las componentes tienen importancia.
+
+Veamos la información acumulada que nos va aportando cada componente principal
+
+```{r}
+summary(analisisPCAEscalados)
+```
+
+Nos quedamos con las 4 primeras componentes que explican el 60% de la variabilidad de los datos. Vemos cuáles son las variables que más influyen.
+
+```{r, echo=FALSE}
+analisisPCAEscalados
+```
+
+
+```{r}
+library(ggfortify)
+#datos$target = as.factor(datos$target)
+autoplot(prcomp(datosContEscalados,scale=T),x=4,y=1, data=datos,colour = datos$Target, loadings = TRUE, loadings.colour = 'darkblue', loadings.label.colour = 'red', loadings.label = TRUE, loadings.label.size = 3)
+```
+
+Podemos ver que las variables speechiness y tempo son las que más influyen en PC4. Liveness también tiene un peso considerable.
+
+
+# 5. Técnicas de aprendizaje NO supervisado
+
+Pasamos a ver las técnicas de aprendizaje no supervisado.
+
+## 5.1. Algoritmo de K-medias
+
+Empezamos por el algoritmo de K-medias que es clustering no jerárquico.
+
+También hemos realizado el proceso para no escalados primero y posteriormente para escalados.
+
+### 5.1.1 K-medias para datos NO escalados
+
+#### Variables continuas NO ESCALADAS
+
+
+```{r, echo=FALSE}
+nCont = dim(datosCont)[1] # número de observaciones
+pCont = dim(datosCont)[2] # número de variables
+```
+
+
+```{r Elección de numero de clusters para no escalados, echo=FALSE}
+#Inicializamos el vector
+SSW2 <- vector(mode = "numeric", length = 10)
+#Variabilidad de todos los datos, es decir, todos los datos como un único cluster
+SSW2[1] <- (nCont - 1) * sum(apply(datosCont,2,var)) 
+#Variabilidad de cada modelo, desde 2 clusters hasta 10 clusters
+for (i in 2:10) SSW2[i] <- sum(kmeans(datosCont,centers=i,nstart=25)$withinss)
+#Dibujamos un gráfico con el resultado
+plot(1:10, SSW2, type="b", xlab="Number of Clusters", ylab="Sum of squares within groups",pch=19, col="steelblue4")
+```
+
+
+```{r, echo=FALSE}
+# k-means para 3 grupos y 25 arranques diferentes
+clusters3.datosCont <- kmeans(datosCont, 3, nstart = 25)
+clusters3.datosCont
+```
+
+
+```{r, echo=FALSE}
+centroides_3 = clusters3.datosCont$centers
+t(centroides_3)
+```
+
+Escogiendo 3 clústers vemos que no hay apenas distinción entre los diferentes grupos.
+
+```{r}
+nk=3 # nk es el numero de clusters 
+pairs(datosCont, col= clusters3.datosCont$cluster,pch=19)
+# Agregamos los centros de los clústers
+points(clusters3.datosCont$centers, col = 1:nk, pch = 19, cex=2)
+```
+
+
+```{r, echo=FALSE}
+# Guardamos el vector con el cluster correspondiente a cada grupo
+clusters3.datosCont_PCA <- clusters3.datosCont$cluster
+library(cluster)
+clusplot(datosCont, clusters3.datosCont_PCA, color=TRUE, shade=TRUE, labels=6,lines=0)
+```
+
+
+### 5.1.2 K-medias para datos escalados
+
+Repetimos el proceso para escalados.
+
+```{r, echo=FALSE}
+n = dim(datosContEscalados)[1]
+p = dim(datosContEscalados)[2]
+```
+
+
+Buscamos el número de clústers óptimo por la regla del codo.
+
+```{r Elección de numero de clusters para escalados}
+#Inicializamos el vector
+SSW <- vector(mode = "numeric", length = 10)
+#Variabilidad de todos los datos, es decir, todos los datos como un único cluster
+SSW[1] <- (n - 1) * sum(apply(datosContEscalados,2,var)) 
+#Variabilidad de cada modelo, desde 2 clusters hasta 15 clusters
+for (i in 2:10) SSW[i] <- sum(kmeans(datosContEscalados,centers=i,nstart=25)$withinss)
+#Dibujamos un gráfico con el resultado
+plot(1:10, SSW, type="b", xlab="Number of Clusters", ylab="Sum of squares within groups",pch=19, col="steelblue4")
+
+```
+
+Viendo la gráfica tomaremos 3 clústers.
+
+```{r}
+set.seed(12223)
+# k-means para 3 grupos y 25 arranques diferentes
+clusters3.datosContEscalados <- kmeans(datosContEscalados, 3, nstart = 25)
+clusters3.datosContEscalados
+```
+
+En este caso los tamaños de cada clúster es 213, 511 y 425. Sin embargo, el porcentaje de variabilidad explicada por estos 3 clústers es en este caso un 23,1%, un porcentaje muy bajo, por lo que tiene pinta de que los clústers no van a estar diferenciados.
+
+
+```{r}
+centroides_esc = clusters3.datosContEscalados$centers
+t(centroides_esc)
+```
+
+Al analizar los centroides vemos que, a pesar de que hay un 23% de variabilidad explicada, parece que difieren en todas las variables entre los diferentes grupos de datos.
+
+Ahora representamos los cluster gráficamente comparando las variables 2 a 2
+
+```{r}
+nk=3 # nk es el numero de clusters 
+pairs(datosContEscalados, col= clusters3.datosContEscalados$cluster,pch=19)
+# Agregamos los centros de los clústers
+points(clusters3.datosContEscalados$centers, col = 1:nk, pch = 19, cex=2)
+```
+
+También los vamos a representar basándonos en las 4 primeras componentes principales.
+
+```{r}
+matrizPCA<-matrix(analisisPCAEscalados$x[,(1:4)],ncol=4)
+colores <- ifelse(clusters3.datosContEscalados$cluster == 2, "blue",
+                  ifelse(clusters3.datosContEscalados$cluster == 3, "green", "red"))
+plot(matrizPCA,col=colores,pch=16)
+```
+
+Con estos gráficos, podemos estar muy seguros de que el algoritmo ha funcionado correctamente. Sin embargo, para terminar de confirmarlo, vamos a realizar una tabla que nos indique la relación entre los dos clústers realizados y la variable respuesta.
+
+```{r}
+tabla_cluster3=table(clusters3.datosContEscalados$cluster,datos$target)
+tabla_cluster3
+```
+
+Y vamos a ver cómo quedan los resultados gráficamente.
+
+```{r}
+library(ggplot2)
+
+# Tu matriz de confusión
+matriz_confusion <- matrix(c(202,11,503,8,409,16), nrow = 3, byrow = TRUE)
+rownames(matriz_confusion) <- c("Cluster 1", "Cluster 2", "Cluster 3")
+colnames(matriz_confusion) <- c("Target 0", "Target 1")
+
+# Convierte la matriz de confusión en un marco de datos para ggplot
+matriz_confusion_df <- as.data.frame(as.table(matriz_confusion))
+
+# Crea el gráfico de barras
+ggplot(matriz_confusion_df, aes(x = Var1, y = Freq, fill = Var2)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Matriz de Confusión",
+       x = "Valor Predicho",
+       y = "Frecuencia") +
+  scale_fill_manual(values = c("Target 0" = "blue", "Target 1" = "red")) +
+  theme_minimal()
+
+```
+
+Porcentaje de 1's en cada cluster.
+
+```{r}
+prediccion_UNOS_cluster1 = tabla_cluster3[1,2]/(tabla_cluster3[1,1]+tabla_cluster3[1,2])
+porcentaje_cluster1 = prediccion_UNOS_cluster1*100
+porcentaje_cluster1
+
+prediccion_UNOS_cluster2 = tabla_cluster3[2,2]/(tabla_cluster3[2,1]+tabla_cluster3[2,2])
+porcentaje_cluster2 = prediccion_UNOS_cluster2 * 100
+porcentaje_cluster2
+
+prediccion_UNOS_cluster3 = tabla_cluster3[3,2]/(tabla_cluster3[3,1]+tabla_cluster3[3,2])
+porcentaje_cluster3 = prediccion_UNOS_cluster3 * 100
+porcentaje_cluster3
+```
+
+Repetimos el proceso para ver qué ocurriría si escogiésemos 2 o 5 clústers, pero quedaban resultados peores.
+
+
+## 5.2. Clústering jerárquico
+
+Pasamos a realizar técnicas de clústering jerárquico. 
+
+Calculamos el coeficiente aglomerativo de diferentes métodos como Complete, Ward y Average y vemos que el más cercano a 1 es el de Ward.
+
+```{r}
+# Clustering jerárquico usando enlace completo
+metodoComplete <- agnes(datosContEscalados, method = "complete" )
+complete = metodoComplete$ac
+complete
+
+
+metodoWard <- agnes(datosContEscalados, method = "ward" )
+ward = metodoWard$ac
+ward
+
+
+metodoAverage <- agnes(datosContEscalados, method = "average" )
+average = metodoAverage$ac
+average
+```
+
+
+Tomando el método de Ward el dendrograma resultante es el siguiente.
+
+```{r matriz de distancias euclídeas, echo=FALSE}
+matrizDist <- dist(datosContEscalados, method = "euclidean")
+```
+
+
+```{r, echo=FALSE}
+clusterJer_ward <- hclust(matrizDist, method="ward.D")
+clusterJer_ward
+```
+
+
+```{r}
+# Cortamos en 5 clusters
+sub_grp <- cutree(clusterJer_ward, k = 5)
+# Visualizamos el corte en el dendrograma
+plot(clusterJer_ward, cex = 0.6)
+rect.hclust(clusterJer_ward, k = 5, border = 2:6)
+```
+
+Por lo que difiere respecto a la solución de clúster no jerárquico con K-medias.
+
+## 5.3. KNN
+
+Veamos también el algoritmo de KNN, el cuál vamos a aplicar para k=3 vecinos.
+
+```{r KNN}
+KNN <- factor(datos$target, labels = c("0", "1"))
+# Calculamos el número de vecinos
+n <- length(datosModificados$year)^((4)/(22+4)) # 22 es el numero de variables que tenemos
+n = round(n)
+# Nos queda que k = 3
+
+# Calculamos el modelo KNN
+modelo_KNN <- knn(train = datosCuant, test = datosCuant_Test, cl = KNN, k = n)
+
+# Vemos la tabla resultante
+tablaKNN = table(modelo_KNN, datos_test$target)
+tablaKNN
+```
+
+Lo que a nosotros nos interesa es la predicción que realiza para canciones con popularidad 1, donde se ve que se aciertan 1 de 4 observaciones, un número no muy alto. Sin embargo, por ejemplo, en el caso de que nosotros trabajásemos para una discográfica y tuviésemos que apostar por un grupo de canciones para ganar dinero de ellas, podríamos usar este modelo KNN para saber por qué canciones apostar y apostar por muy pocas.
+
+Podemos ver cuáles son estas 4 canciones por las que apostaríamos.
+
+```{r canciones por las que apostamos}
+apuesta = datos_test[modelo_KNN==1,]
+View(apuesta)
+```
+
+Y calculamos las popularidades de estas.
+
+```{r popularidad de las canciones por las que apostamos}
+# CANCION 1
+cancion1 <- "First Class"
+cancion_FC <- subset(datosBase, datosBase$track_name == cancion1)
+cancion_FC$track_popularity
+
+# CANCION 2
+cancion2 <- "Watermelon Sugar"
+cancion_WS <- subset(datosBase, datosBase$track_name == cancion2)
+cancion_WS$track_popularity
+
+# CANCION 3
+cancion3 <- "Don't Call Me Up"
+cancion_DCMU <- subset(datosBase, datosBase$track_name == cancion3)
+cancion_DCMU$track_popularity
+
+# CANCION 4
+cancion4 <- "Rain On Me (with Ariana Grande)"
+cancion_ROM <- subset(datosBase, datosBase$track_name == cancion4)
+cancion_ROM$track_popularity
+```
+
+Hay un super hit con 90 de popularidad, pero también dos canciones con popularidad muy alta que nos harían tener mucho éxito.
+
+Podríamos obtener las medidas de la tabla.
+
+```{r}
+#install.packages("caret")
+library(caret)
+
+# Convertir datos_test$target a factor con los mismos niveles que KNN
+datos_test$target <- factor(datos_test$target, levels = levels(KNN))
+
+# Calcular la matriz de confusión
+confusion_matrix <- confusionMatrix(modelo_KNN, datos_test$target)
+
+# Imprimir la matriz de confusión
+print(confusion_matrix)
+```
+
+
+
 ## Árbol de Decisión , Random Forest, SVM y GLM
 
 
