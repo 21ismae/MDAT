@@ -856,7 +856,861 @@ También sabemos que, a pesar de haber encontrado alguna correlación,  en gener
 
 
 
-________________________APARTADO DAVID_______________________________________
+# Técnicas de reducción de la dimensionalidad
+
+Para comprender y analizar la información sobre las variables cuantitativas, en concreto las continuas en nuestro caso, podemos llevar a cabo técnicas de reducción de la dimensionalidad. Con estas ténicas vamos a buscar equilibrio entre la riqueza de información y la simplicidad en el análisis. Una de las ténicas de reducción de dimensionalidad más utilizadas es el estudio de las PCA.
+
+## Estudio de PCA
+
+El estudio o análisis de Componentes Principales (PCA, Principal Component Analysis) es una técnica estadística que utilizamos para reducir la dimensionalidad, esto es, tiene el objetivo de simplificar nuestro conjunto de datos reduciendo la cantidad de variables, a la vez que conserva la mayor cantidad de información posible relevante. Para ello, transforma las variables originales en un nuevo conjunto de variables no correlacionadas llamadas componentes principales, que capturan la mayor parte de la variabilidad en los datos.
+
+Además de para reducir la dimensionalidad, esta técnica sirve para comprender y visualizar los datos de forma más sencilla, eliminar la multicolinealidad (ya que analizamos la correlación entre las variables), identificación de patrones...
+
+Vamos a llevar a cabo el estudio de las PCA de las variables continuas. En primer lugar vamos a hacerlo para variables sin escalar y, posteriormente, para variables escaladas, para ver si las diferencias en los resultados nos infiere alguna conclusión. Cabe destacar que para realizar este análisis usaremos los datos train, en concreto únicamente las variables continuas. 
+
+
+### Variables continuas NO ESCALADAS
+
+Veamos que ocurre al calcular las PCA si no hubiésemos escalado los datos. En primer lugar analizamos la correlación entre las variables de nuestro conjunto de datos.
+
+```{r Correlacion de variables continuas no escaladas}
+# En primer lugar calculamos la matriz de covarianzas
+cov(datosCont)
+
+# Como a veces es dificil de interpretar la covarianza, calculamos la matriz de correlaciones
+cor(datosCont)
+```
+
+Podemos observar que existe alta correlación positiva entre las variables loudness y energy (con 0,699), y también una relación considerable entre las variables danceability y valence (con 0,415). Por otro lado, entre las variables energy y acousticness existe una alta correlación negativa (con -0,565). Entre el resto de variables la relación es muy probre, es decir, existe muy poca correlación entre las variables de nuestros datos.
+
+Una vez hemos analizado la correlación, pasamos a calcular ahora las PCA
+
+```{r PCA para no escalados}
+analisisPCA_NoEscalados <- prcomp(datosCont, scale= FALSE)
+# Vemos los resultados
+analisisPCA_NoEscalados
+```
+
+En los resultados podemos observar las standard deviations, que son los autovalores de la matriz de correlaciones, y representan la variabilidad explicada en cada componente principal. A mayor valor de la standard deviations supone una mayor variabilidad explicada por la componente principal asociada. Tenemos por tanto que, el primer componente principal explica la mayor cantidad de variabilidad en los datos, ya que presenta un valor mucho más grande que el resto. Esto nos lleva directamente a pensar que hay un problema, ya que en general, la explicabilidad debería ser explicada en general por todas las componentes principales. Vamos a tratar de encontrar el problema.
+
+Veamos gráficamente la variabilidad explicada por cada componente.
+
+```{r}
+plot(prcomp(datosCont))
+```
+
+Podemos observar lo que ya sabíamos, que la primera componente es la más explicativa con diferencia. Normalmente se examina la proporción acumulativa de varianza explicada al considerar múltiples componentes principales. Esta proporción acumulativa te indica cuánta variabilidad total se tiene al incluir los primeros k componentes principales, lo que ayuda a tomar decisiones sobre con cuántos componentes principales quedarnos. Por tanto, vamos a calcular esta proporción acumulativa de varianza explicada.
+
+```{r}
+summary(analisisPCA_NoEscalados)
+```
+
+Una vez calculada la proporción acumulativa de varianza explicada para cada número de componentes principales, vemos que desde la PC1 es 1. Esto significa que el primer componente principal explica el 100% de la variabilidad de los datos, lo cual supone que el resto de componentes principales no pueden mejorar la variabilidad.
+
+Ahora interesa ver cuáles son las variables que más influyen en esta PC1 para ver qué es lo que realmente ocurre. Para ello recuperamos la matriz de rotaciones de las PCA y nos fijamos en la columna PC1.
+
+```{r}
+analisisPCA_NoEscalados
+```
+
+Podemos ver que la variable duración tiene un peso de 1, mientras que el resto de variables todas tienen pesos cercanos a cero. Por tanto, esta variable duración es la única relevante. Es este el problema que tenemos, los datos no están escalados y como los valores de dicha variable duración son muy grandes (porque están en milisegundos) en comparación con el resto, supone que se considere que esta variable tenga más importancia. Sin embargo, esto no es correcto y sucede porque los datos no están escalados.
+
+Esto es algo que ya habíamos intuído antes de realizar el análisis PCA para datos no escalados, sin embargo nos parecía interesante ver qué ocurría para comprender mejor nuestro conjunto de datos.
+
+Antes de seguir, podríamos incluso ver un gráfico comparando PC1 y PC2 para ver que realmente la importancia de la variable duración está alejada del resto respecto a la compronente PC1.
+
+```{r}
+biplot(prcomp(datosCont_Test))
+```
+
+Tras esto, vamos a repetir el proceso correctamente con los datos escalados.
+
+### 4.1.2 Variables continuas ESCALADAS
+
+Primero escalamos los datos continuos de train.
+
+```{r Creacion de datosContEscalados}
+datosContEscalados = scale(datosCont)
+```
+
+En primer lugar debemos analizar la correlación entre las variables de nuestros datos, sin embargo, como al escalar los datos la correlación no se ve afectada y ya la hemos analizado previamente, pasamos a calcular directamente las componentes principales.
+
+Realizamos el cálculo de las PCA.
+
+```{r Analisis PCA para datos escalados}
+analisisPCAEscalados <- prcomp(datosContEscalados, scale= TRUE)
+# Vemos los resultados
+analisisPCAEscalados
+```
+
+Observamos que los resultados y las PCA han cambiado respecto al análisis con datos no escalados ya que la matriz de rotación es diferente. En esta ocasión la standard deviation más grande sigue siendo la de la primera componente principal (PC1) ya que de nuevo tiene un valor más grande que el resto. Sin embargo ahora las standard deviations son mucho más pequeñas y más similares entre ellas. Esto supone que todas las componentes contribuyen en la explicación de la variabilidad de los datos. Podemos verlo gráficamente.
+
+```{r}
+plot(prcomp(datosContEscalados))
+```
+
+Se observa como hemos comentado que la PC1 es la que más explica la variabilidad de nuestro conjunto de datos, pero también observamos que el resto de componentes, aunque en menor medida, también explican parte de la variabilidad de los datos. Podemos calcular la proporción acumulada de varianza explicada al considerar múltiples componentes principales, viendo así cuánto mejora la explicabilidad el añadir cada componente principal.
+
+```{r}
+summary(analisisPCAEscalados)
+```
+
+Una vez calculada la proporción acumulada de varianza explicada para cada número de componentes principales, decidimos considerar la proporción acumulada a partir de los primeros 4 componentes principales, que tienen una proporción acumulativa de 0.6. Esto significa que las 4 primeras componentes explican el 60% de la variabilidad de los datos. Nos quedamos con PC4 porque a partir entonces la proporción acumulativa, aunque sigue aumentando, creemos que no aumenta de manera considerable como para considerar un número mayor de componentes principales. Además, el 60% es un porcentaje suficientemente grande de explicabilidad de los datos.
+
+Una vez tenemos decidido el quedarnos con las 4 primeras componentes principales, vemos cuáles son las variables que más influyen en esta PC4. Para ello nos fijamos esta vez en la columna PC4 de la matriz de rotaciones.
+
+```{r}
+analisisPCAEscalados
+```
+
+Analizando PC4 podemos ver que las variables speechiness y tempo con unos pesos de 0.73360672 y 0.58896110 respectivamente tienen mayor importancia que el resto de variables, es decir, están fuertemente correlacionadas de manera positiva con PC4, mientras que el resto de variables tienen pesos considerables pero más cercanos a cero. Por ejemplo, podemos ver que danceability, loudness, liveness o instrumentalness también tienen una cierta importancia. Por tanto los pesos de las variables speechiness y tempo contrarrestan los pesos del resto de variables.
+
+Por otro lado, si por ejemplo hubiésemos considerado las 5 primeras componentes principales, estas explicaban un 70% de la variabilidad de los datos, y las canciones serían ordenadas en base a la instrumentalidad, el liveness y la duración, ponderando en sentido contrario acousticness y loudness. 
+
+Sin embargo, como antes hemos dicho, nosotros hemos pensado que con explicar el 60% de la variabilidad de los datos tomando cuatro componentes principales es suficiente, ya que estamos ante un conjunto de datos cuya complejidad es elevada.
+
+Una vez visto esto, lo que vamos a hacer es comparar PC4 con otras componentes gráficamente. Empazamos comparando PC1 con PC4.
+
+```{r}
+library(ggfortify)
+autoplot(prcomp(datosContEscalados,scale=T),x=4,y=1, data=datos,colour = datos$Target, loadings = TRUE, loadings.colour = 'blue', loadings.label.colour = 'red', loadings.label = TRUE, loadings.label.size = 4)
+```
+
+Podemos observar que en PC4 realmente speechiness y tempo tienen un importante efecto de correlación positiva mientras que el resto de variables tienen valores situados entorno a 0. Sin embargo en PC1 se puede observar como acousticness tiene un efecto en dirección positiva mientras que loudness, energy y valence tienen un efecto en dirección negativa.
+
+Comparamos ahora PC2 con PC4.
+
+```{r}
+library(ggfortify)
+#datos$target = as.factor(datos$target)
+autoplot(prcomp(datosContEscalados,scale=T),x=4,y=2, data=datos,colour = datos$Target, loadings = TRUE, loadings.colour = 'blue', loadings.label.colour = 'red', loadings.label = TRUE, loadings.label.size = 4)
+```
+
+En este caso observamos que PC4 los resultados son los mismos, pero PC2 influye de manera considerable en la representación ya que en PC2 tempo y speechiness tienen sentidos contrarios. En concreto en PC2 las variables danzabilidad, speechiness y valence tienen un sentido positivo, mientras que tempo tiene un sentido negativo. Por ello, en la gráfica aparece speechiness como una variable que tiene sentido positivo en ambas componentes, mientras que tempo únicamente siente dirección positiva en PC4, pero negativa en PC2.
+
+
+Comparamos también PC3 y PC4.
+
+```{r}
+library(ggfortify)
+#datos$target = as.factor(datos$target)
+autoplot(prcomp(datosContEscalados,scale=T),x=4,y=3, data=datos,colour = datos$Target, loadings = TRUE, loadings.colour = 'blue', loadings.label.colour = 'red', loadings.label = TRUE, loadings.label.size = 4)
+```
+
+En este caso ocurre algo similar que al comparar PC2 y PC4, observamos que en PC3 speechiness y tempo tienen direcciones opuestas. En PC2 las variables instrumentalidad y tempo tienen un sentido positivo, mientras que spechiness, liveness y duración tiene un sentido negativo contrarrestando el peso de las otras.
+
+
+Comparamos también PC5 y PC4.
+
+```{r}
+library(ggfortify)
+#datos$target = as.factor(datos$target)
+autoplot(prcomp(datosContEscalados,scale=T),x=4,y=5, data=datos,colour = datos$Target, loadings = TRUE, loadings.colour = 'blue', loadings.label.colour = 'red', loadings.label = TRUE, loadings.label.size = 4)
+```
+
+Por último, comparando PC4 con PC5 podemos observar cómo en PC5 las variables con una dirección positiva son instrumentalness liveness, duración y speechiness, de las cuales instrumentalness y duracion tienen una dirección negativa en PC4. Por otro lado, las que tienen dirección negativa considerable en PC5 son acousticness, doudness y tempo, mientras que esta última tiene una dirección positiva en PC4.
+
+
+## Conclusiones PCA
+
+Una vez realizado el estudio de las PCA podemos extraer diferentes conclusiones. En primer lugar, aunque era evidente que debíamos escalar los datos para realizar el análisis, a la hora de hacer PCA con datos no escalados vemos claramente como el hecho de que una variable como duración de las canciones tenga unos datos mucho más grandes que el resto supone que se considere como variable más importante que el resto y se le cargue a dicha variable la explicación de la variabilidad de los datos.
+
+Por otro lado, una vez hemos escalado los datos, como ya sabíamos nuestro conjunto de datos es bastante complejo y en ocasiones difícil de interpretar. Esta es la razón por la que hemos decidido que, al calcular la proporción acumulada de varianza explicada, nos quedemos únicamente con un 60%, que corresponde a lo explicado por las 4 primeras componentes principales (PC4). Aumentando a 5 componentes principales tendríamos un 70% de variabilidad explicada, sin embargo, creemos que al aumentar la cantidad de componentes principales consideradas en una unidad nos enfrentaríamos a un problema bastante más complejo que no merece la pena comparándolo con el 10% de mejora. Además, un 60% no es muy alto pero es una explicabilidad muy a tener en cuenta.
+
+En cuanto a PC4, hay que destacar que las variables speechiness y tempo tienen una importancia mayor que el resto de variables. Estas tienen unos pesos de 0.734 y 0.59 respectivamente, luego están fuertemente correlacionadas de manera positiva con PC4, mientras que el resto de variables tienen pesos considerables pero más cercanos a cero. Por ejemplo, hemos visto que danceability, loudness, liveness o instrumentalness también tienen una cierta importancia. Con esto podemos entender PC4 como una componente principal donde las variables speechiness, tempo e incluso liveness contrarrestan los pesos del resto de variables. Esto es, las canciones van a estar ordenadas por sus valores de speechiness y tempo, ponderando en sentido contrario la instrumentalidad, el sonido (loudness) y la danzabilidad.
+
+Por ejemplo, se puede entender que, canciones con un mayor speechiness, tienen una menor danzabilidad y una menor instrumentalidad, lo cual es lógico ya que canciones donde predomina más la voz del cantante normalmente la instrumentalidad es menor, lo que conlleva que la danzabilidad también sea menor. 
+
+Por último, analizando las gráficas obtenidas al comparar PC4 con otras comoponentes (PC1. PC2...), podemos observar que en general las observaciones siempre están muy agrupadas entorno a un centro, con la excepción de algunas observaciones que se alejan un poco de dicha agrupación pero no mucho. Además, en cada una de las gráficas se puede observar como para cada una de las componentes se tiene que las variables toman una dirección y sentido diferentes, sin poder establecer un patrón entre ellas, lo cuál dificulta en cierta medida el análisis.
+
+Cabe destacar en al comparar PC4 con PC3 y con PC5 hay algunas observaciones algo alejadas del centro y que podrían hacer referencia a superhits.
+
+
+# Técnicas de aprendizaje NO supervisado
+
+Los modelos de aprendizaje no supervisado tienen como objetivo dividir el conjunto de datos en
+grupos de observaciones donde cada observación se parezca lo más posible a las otras observaciones de su mismo grupo y lo menos posible a las observaciones de los otros grupos. Dichos grupos reciben el nombre de clústers.
+
+Entre los algoritmos o técnicas de aprendizaje no supervisado podemos hacer una clasificación en dos grupos.
+
+Por un lado tenemos el clústering jerárquico, basado en una jerarquía de grupos anidados, es decir, parte de tantos clústers como datos tengamos y, a medida que va iterando el algoritmo, los clústers más cercanos se van fusionando entre sí para formar clústers más grandes.
+
+Por otro lado tenemos el clústering no jerárquico, basado en la partición del conjunto de datos en un número determinado de clústers definido previamente, que no tienen relación jerárquica entre sí.
+
+Vamos a comenzar viendo una de las técnicas más conocidas de clústering no jerárquico, el algoritmo de K-medias (K-means).
+
+## Algoritmo de K-medias
+
+Este algoritmo de clustering no jerárquico se basa en dividir los datos en K grupos basándonos en el cálculo de alguna distancia entre los datos para ello. En concreto, el agrupamiento se realiza minimizando la suma de distancias entre cada observación y el centroide de su grupo o clúster. Normalmente se suele usar la distancia cuadrática.
+
+Cabe destacar que la cantidad K de grupos hay que decidirla con anterioridad a la realización del algoritmo. Para decirdirlo, existen muchas técnicas, pero una muy utilizada (y la que nosotros vamos a usar) es la regla del codo. Esta se basa en el hecho de que, a medida que aumenta el número de clústers, la varianza dentro de cada cluster disminuirá, y por lo tanto, la suma de cuadrados entre clústers (SSW) disminuirá también. Por tanto, se debe identificar el punto en el que la disminución de la varianza ya no es significativa. Para ello, podemos graficar el SSW respecto al número de clústers y ver en qué punto de la gráfica se forma una especie de "codo". Debemos quedarnos con el número de clústers donde se encuentra dicho "codo".
+
+
+Al igual que hicimos con PCA, vamos a llevar a cabo el algoritmo de K-medias tanto para datos no escalados como para escalados para ver las diferencias. El correcto obviamente será el de datos escalados ya que hay variables con datos muy grandes o muy pequeños respecto a otras, pero puede ser interesante ver las diferencias. Cabe destacar que para realizar este análisis usaremos los datos train, en concreto únicamente las variables continuas.
+
+
+### K-medias para datos continuos NO escalados
+
+En primer lugar vamos a ver las dimensiones de los datos train únicamente con las variables continuas.
+
+```{r }
+nCont = dim(datosCont)[1] # número de observaciones
+pCont = dim(datosCont)[2] # número de variables
+```
+
+Tenemos un total de 1149 observaciones y 10 variables. Una vez tenemos guardados estos números, al tratarse de un algoritmo de clustering no jerárquico debemos elegir previamente el número de clústers óptimo. Lo vemos por la regla del codo de la que hemos hablado previamente
+
+```{r Elección de numero de clusters para no escalados}
+#Inicializamos el vector
+SSW2 <- vector(mode = "numeric", length = 10)
+#Variabilidad de todos los datos, es decir, todos los datos como un único cluster
+SSW2[1] <- (nCont - 1) * sum(apply(datosCont,2,var)) 
+#Variabilidad de cada modelo, desde 2 clusters hasta 10 clusters
+for (i in 2:10) SSW2[i] <- sum(kmeans(datosCont,centers=i,nstart=25)$withinss)
+#Dibujamos un gráfico con el resultado
+plot(1:10, SSW2, type="b", xlab="Number of Clusters", ylab="Sum of squares within groups",pch=19, col="steelblue4")
+```
+
+Se aprecia que el codo se encuentra en 3 por lo que nos vamos a quedar con un total de 3 clústers o grupos. Una vez decidido el número de clústers óptimo, ya podemos hacer uso del algoritmo de k-medias. Para ello, vamos a llamar a la función kmeans() con k=3, donde k es el número de clústers que deseamos.Además, indicamos que el algoritmo se ejecute 25 veces, de las cuales el resultado nos proporcionará la mejor.
+
+```{r}
+# k-means para 3 grupos y 25 arranques diferentes
+clusters3.datosCont <- kmeans(datosCont, 3, nstart = 25)
+clusters3.datosCont
+```
+
+Una vez calculados los clústers, llamando al objeto creado podemos acceder a ellos para analizarlos. Por ejemplo, vemos el número de observaciones que hay en cada clúster.
+
+```{r}
+clusters3.datosCont$size
+```
+
+Tenemos que en este caso el tamaño de los clústers son 391, 575 y 183. Podemos obtener también los centroides de dichos clústers, obteniendo lo siguiente.
+
+```{r}
+centroides_3 = clusters3.datosCont$centers
+t(centroides_3)
+```
+
+Por ejemplo, para el clúster 1 la variable danceability tiene un centroide de 0,67, para el clúster 2 de 0,655 y para el clúster 3 de 0,63, por lo que no varía mucho entre los diferentes grupos. Donde parece que se ven en general las mayores diferencias es en la duración de las canciones, pero esto se debe a que no estan escalados los datos y la duración tiene unos valores muy grandes.
+
+Ahora representamos los cluster gráficamente comparado las variables implicadas 2 a 2.
+
+```{r}
+nk=3 # nk es el numero de clusters 
+pairs(datosCont, col= clusters3.datosCont$cluster,pch=19)
+# Agregamos los centros de los clústers
+points(clusters3.datosCont$centers, col = 1:nk, pch = 19, cex=2)
+```
+
+Vemos que las únicas diferencias entre grupos están en la duración, como habíamos previsto numéricamente. Sin embargo, como también hemos dicho, esto se debe principalmente a que los datos no están escalados. Vamos a repetir el proceso para datos escalados.
+
+Antes de ello, vamos a representar los clústers de otra manera, basándonos en las componentes principales. Esto consiste en reducir la dimensión de los datos utilizando el método de las PCA y pintaremos un gráfico con las dos primeras componentes.
+
+```{r}
+# Guardamos el vector con el cluster correspondiente a cada grupo
+clusters3.datosCont_PCA <- clusters3.datosCont$cluster
+library(cluster)
+clusplot(datosCont, clusters3.datosCont_PCA, color=TRUE, shade=TRUE, labels=6,lines=0)
+```
+
+Como podemos observar, los grupos están unos sobre otros y no hay prácticamente diferencias entre ellos, por lo que esto es una evidencia más de que deberíamos escalar los datos.
+
+### K-medias para datos escalados
+
+Como los datos ya están escalados de cuando hemos realizado el análisis de las componentes principales PCA, no debemos escalarlos de nuevo. En primer lugar vemos a ver las dimensiones de los datos train únicamente con las variables continuas, aunque obviamente tendrá el mismo resultado que cuando lo hemos hecho anteriormente para los no escalados.
+
+```{r}
+n = dim(datosContEscalados)[1]
+p = dim(datosContEscalados)[2]
+```
+
+
+Una vez guardados estos datos, buscamos el número de clústers óptimo por la regla del codo.
+
+```{r Elección de numero de clusters para escalados}
+#Inicializamos el vector
+SSW <- vector(mode = "numeric", length = 10)
+#Variabilidad de todos los datos, es decir, todos los datos como un único cluster
+SSW[1] <- (n - 1) * sum(apply(datosContEscalados,2,var)) 
+#Variabilidad de cada modelo, desde 2 clusters hasta 15 clusters
+for (i in 2:10) SSW[i] <- sum(kmeans(datosContEscalados,centers=i,nstart=25)$withinss)
+#Dibujamos un gráfico con el resultado
+plot(1:10, SSW, type="b", xlab="Number of Clusters", ylab="Sum of squares within groups",pch=19, col="steelblue4")
+
+```
+
+Se aprecia que el codo se encuentra en 3 de nuevo, por lo que haremos una división en 3 clústers. Por tanto, vamos a usar el algoritmo de K-medias con k=3.
+
+Sin embargo, antes de ello vamos a ver el resultado del número de clústers óptimo que obtendríamos con la función NbClust. En esta función se llevan a cabo diferentes "pruebas" donde se toman diferentes números de clústers y se ve cuál es la que más se repite, siendo este el resultado de clústers óptimo. De esta manera podemos contrastar si el número de clústers que hemos seleccionado con la regla del codo es correcto en cierta medida, si coincide con el resultado de la función MbClust.
+
+```{r}
+library(NbClust)
+nb <- NbClust(datosContEscalados, distance = "euclidean", min.nc = 2, max.nc = 10, method = "kmeans")
+```
+
+Podemos observar que con la función NbClust el número de clústers óptimo es 8. A pesar de salir este resultado, creemos que es un número muy elevado de clústers, por lo que vamos a omitir este resultado. Incluso hemos probado qué saldría para 8 clústers y los resultados, sobre todo las gráficas, son muy poco visuales ya que estan todos los datos entremezclados, por lo que es una evidencia de que 8 es un número muy elevado. El siguiente número de clústers óptimo que se indica es 2, pero nos parece que es un número muy pequeño. Por tanto, nos quedaremos con 3 clústers que es el siguiente número de clústers óptimos que sigue a 2 en la función NbClust y el que hemos obtenido por la regla del codo. Además, posteriormente también veremos los resultados que obtendríamos para 2 y 5 clústers, para hacer una comparación con lo que nosotros hemos elegido.
+
+#### K-medias con 3 clústers
+
+```{r}
+set.seed(5555)
+# k-means para 3 grupos y 25 arranques diferentes
+clusters3.datosContEscalados <- kmeans(datosContEscalados, 3, nstart = 25)
+clusters3.datosContEscalados
+```
+
+Una vez calculados los clústers, llamando al objeto creado podemos acceder a ellos para analizarlos. Por ejemplo, vemos el número de observaciones que hay en cada clúster.
+
+```{r}
+clusters3.datosContEscalados$size
+```
+
+En este caso el tamaño de cada clúster es 425, 213 y 511 respectivamente, habiendo notables diferencias con los del caso de datos no escalados. Además, el porcentaje de variabilidad explicada por estos 3 clústers en comparación con la variabilidad total de los datos es en este caso un 23,1%, un porcentaje muy bajo, por lo que tiene pinta de que los clústers no van a estar diferenciados.
+
+Veamos los centroides.
+
+```{r}
+centroides_esc = clusters3.datosContEscalados$centers
+t(centroides_esc)
+```
+
+Al analizar los centroides vemos que, a pesar de que hay un 23% de variabilidad explicada, parece que difieren en todas las variables entre los diferentes grupos de datos. Por ejemplo, para el clúster 1 la variable danceability tiene un centroide de 0,674, para el clúster 2 de -0,326 y para el clúster 3 de -0,647, por lo que varía mucho entre los diferentes grupos.
+
+Ahora representamos los cluster gráficamente comparando las variables 2 a 2
+
+```{r}
+nk=3 # nk es el numero de clusters 
+pairs(datosContEscalados, col= clusters3.datosContEscalados$cluster,pch=19)
+# Agregamos los centros de los clústers
+points(clusters3.datosContEscalados$centers, col = 1:nk, pch = 19, cex=2)
+```
+
+En esta ocasión, podemos ver que en ciertas comparaciones entre variables se aprecian los 3 grupos bien diferenciados. Por ejemplo, la variable danceability con energy, loudness o acousticness refleja considerablemente la diferencia entre grupos. En general, energy, acousticness y loudness, sea cual sea la variable con la que la comparamos, muestran la diferencia entre los 3 clústers. Por el contrario, instrumentalness, duration, tempo y liveness al ser comparadas con otras variables no reflejan mucho estos grupos.
+
+Por último, vamos a representar los clústers basándonos en las componentes principales, PCA, en concreto comparando las dos primeras componentes principales. 
+
+```{r}
+# Guardamos el vector con el cluster correspondiente a cada grupo
+clusters3.datosContEscalados_PCA <- clusters3.datosContEscalados$cluster
+library(cluster)
+clusplot(datosContEscalados, clusters3.datosContEscalados_PCA, color=TRUE, shade=TRUE, labels=6,lines=0)
+```
+
+
+Como podemos observar, al igual que para datos no escalados, los grupos están unos sobre otros, pero en mucha menor medida. En esta ocasión están más diferenciados los 3 clústers, luego escalando los datos hemos mejorado considerablemente el resultado del algoritmo K-medias. Pero las dos componentes principales únicamente explican el 38,94% de la variabilidad, vamos a ver que pasa para más componentes principales.
+
+Para el caso de datos escalados, al realizar PCA escogimos las 4 primeras componentes principales. Si ahora definimos la matriz de PCA para esas 4 primeras componentes principales y graficamos en un gráfico de 2 dimensiones los resultados obtenidos en clustering por el algoritmo de K-medias, obtenemos el siguiente resultado, donde se ven completamente diferenciados los grupos.
+
+```{r}
+matrizPCA<-matrix(analisisPCAEscalados$x[,(1:4)],ncol=4)
+colores <- ifelse(clusters3.datosContEscalados$cluster == 2, "blue",
+                  ifelse(clusters3.datosContEscalados$cluster == 3, "green", "red"))
+plot(matrizPCA,col=colores,pch=16)
+```
+
+Con estos gráficos, podemos estar muy seguros de que el algoritmo ha funcionado correctamente. Vamos a ver qué ocurriría si en vez de 3 clústers tomásemos 2 o 5. De esta manera podemos ver que 3 es el número de clústers más adecuado ya que para 2 o 5 salen resultados peores y menos visuales. Y, posteriormente, tras ver que 3 es el número más óptimo, volveremos a este caso para analizar en profundidad los resultados.
+
+
+#### K-medias con 2 clústers
+
+Vamos a repetir el proceso tomando únicamente 2 clústers.
+
+```{r}
+# k-means para 2 grupos y 25 arranques diferentes
+clusters2.datosContEscalados <- kmeans(datosContEscalados, 2, nstart = 25)
+clusters2.datosContEscalados
+```
+
+En este caso el porcentaje de variabilidad explicada por estos 2 clústers es un 15,4%, un porcentaje más bajo aún que para 3 clústers, aunque los centroides parecen estar suficientemente diferenciados entre las variables de ambos grupos. Vamos a representarlo gráficamente comparando las variables 2 a 2
+
+```{r}
+nk=2 # nk es el numero de clusters 
+pairs(datosContEscalados, col= clusters2.datosContEscalados$cluster,pch=19)
+# Agregamos los centros de los clústers
+points(clusters2.datosContEscalados$centers, col = 1:nk, pch = 19, cex=2)
+```
+
+A simple vista parece una separación en grupos similar a la de 3 clústers, aunque si nos fijamos bien ahora las variables liveness, acousticness y tempo representan mejor esta separación en grupos al ser comparadas con otras variables.
+
+Realizamos la gráfica de los clústers basándonos en las dos primeras componentes principales.
+
+```{r}
+# Guardamos el vector con el cluster correspondiente a cada grupo
+clusters2.datosContEscalados_PCA <- clusters2.datosContEscalados$cluster
+library(cluster)
+clusplot(datosContEscalados, clusters2.datosContEscalados_PCA, color=TRUE, shade=TRUE, labels=6,lines=0)
+```
+
+Otra vez hay intersección entre los grupos, pero se aprecia en gran medida la diferencia entre estos.
+
+Si por último miramos la matriz de PCA para las 4 primeras componentes principales y graficamos en un gráfico de 2 dimensiones los resultados obtenidos en clustering por el algoritmo de K-medias, obtenemos que los grupos están altamente separados.
+
+```{r}
+matrizPCA<-matrix(analisisPCAEscalados$x[,(1:4)],ncol=4)
+colores <- ifelse(clusters2.datosContEscalados$cluster == 2, "blue",
+                  ifelse(clusters2.datosContEscalados$cluster == 3, "green", "red"))
+plot(matrizPCA,col=colores,pch=16)
+```
+
+Podemos observar que los grupos están altamente separados y que, incluso, los resultados son mejores que para 3 clústers. Sin embargo, preferimos quedarnos con 3 clústers ya que dividir los datos en 2 grupos nos parece muy poco y pensamos que, como para 3 clústers también están diferenciados los grupos considerablemente, puede ser mejor.
+
+#### K-medias con 5 clústers
+
+Por último repetimos el proceso para 5 clústers
+
+```{r}
+# k-means para 2 grupos y 25 arranques diferentes
+clusters5.datosContEscalados <- kmeans(datosContEscalados, 5, nstart = 25)
+clusters5.datosContEscalados
+```
+
+En este caso el porcentaje de variabilidad explicada por estos 2 clústers es un 36,8%, un porcentaje más alto que para 3 clústers, pero esto puede deberse a que al tener más grupos es evidente que explicará más la variabilidad. Los centroides parecen estar diferenciados entre las variables de los diferentes grupos. Lo representamos gráficamente comparando las variables 2 a 2.
+
+```{r}
+nk=5 # nk es el numero de clusters 
+pairs(datosContEscalados, col= clusters5.datosContEscalados$cluster,pch=19)
+# Agregamos los centros de los clústers
+points(clusters5.datosContEscalados$centers, col = 1:nk, pch = 19, cex=2)
+```
+
+En esta ocasión se ve en algunas variables los grupos diferenciados, pero quizás a simple vista es más difícil que para 2 y 3 clústers. Lo que sí parece es que las observaciones de cada grupo predominan en diferentes variables, de ahí a que hayan sido separadas en tales grupos los datos, ya que comparten características similares.
+
+Realizamos la gráfica de los clústers basándonos en las dos primeras componentes principales.
+
+```{r}
+# Guardamos el vector con el cluster correspondiente a cada grupo
+clusters5.datosContEscalados_PCA <- clusters5.datosContEscalados$cluster
+library(cluster)
+clusplot(datosContEscalados, clusters5.datosContEscalados_PCA, color=TRUE, shade=TRUE, labels=6,lines=0)
+```
+
+En esta ocasión se ve muy poco clara la diferencia entre grupos, hay mucha superposición entre unos y otros, luego vemos que es un peor resultado al algoritmo K-medias que en los que hemos usado 2 y 3 clústers.
+
+Si por último comparamos los clústers con la matriz de PCA para las 4 primeras componentes principales y lo graficamos, obtenemos que podemos diferenciar los grupos, aunque no de manera tan sencilla como en los casos anteriores.
+
+```{r}
+matrizPCA<-matrix(analisisPCAEscalados$x[,(1:4)],ncol=4)
+colores <- ifelse(clusters5.datosContEscalados$cluster == 1, "blue",
+                  ifelse(clusters5.datosContEscalados$cluster == 2, "green",
+                  ifelse(clusters5.datosContEscalados$cluster == 3, "red",
+                  ifelse(clusters5.datosContEscalados$cluster == 4, "purple", "orange"))))
+plot(matrizPCA,col=colores,pch=16)
+```
+
+Por tanto, pensamos que el mejor algoritmo ha sido el que utiliza 3 clústers, ya que el de 5 clústers divide los datos en más grupos de lo que debería y para 2 clústers quizás se queda algo corto.
+
+#### Conclusiones sobre el algoritmo K-medias
+
+Una vez hemos realizado el algoritmo de K-medias tanto para datos no escalados como para escalados, y en el caso de los segundos para diferentes cantidades de clústers, podemos concluir que el número de clústers que mejor se adapta a nuestros datos es 3. Aunque con la función NbClust saliese que el número de clústers óptimos debían ser 2 u 8 y hayamos visto qué resultados se obtienen con dichos números de grupos, y hayamos probado también para cuando el número de clústers es 4 y 5, el número de clústers que obtuvimos realizando la regla del codo fue 3 y, tras analizar los resultados, sobre todo visualmente, hemos concluido que realmente 3 es el número de clústers con los que nos quedamos. 
+
+Tras esta decisión, vamos a ver cómo influyen las variables en cada uno de los 3 clústers resultantes.
+
+```{r}
+library(parameters)
+res_kmeans <- cluster_analysis(datosContEscalados, n=3, method="kmeans")
+plot(summary(res_kmeans))
+```
+
+Se puede observar cómo en el clúster 2 predominan canciones con un alto nivel de speechiness, es decir, canciones donde predomina la voz, lo cual supone que tengan bajos valores de energía, instrumentalidad y energía. Sin embargo, sorprende que si nos fijamos en la variable danzabilidad en este clúster y la comparamos con el resto de clústers, tenemos que también son las canciones con mayor danzabilidad, lo cual es sorprendente ya que lo lógico es pensar que el hecho de que una canción sea danzable o bailable fuese muy ligado a la energía y a la instrumentalidad, aunque ya sabíamos que no tras analizar la correlación de las variables. Hay que destacar también que las canciones de este grupo no tienen ni una duración muy larga ni muy corta, respondiendo así a una de las preguntas que nos hicimos al principio del trabajo.
+
+Por otro lado, si analizamos el clúster 1, vemos que las canciones en este grupo parece que no predominan considerablemente en ninguna variable, sin embargo, si comparamos con los otros grupos podemos observar como son canciones que presentan la mayor energía y sonido (loudness). También, son las canciones con menor aousticness. Además, algo destacable es que estas canciones no son nada danzables ya que en general el valor de danzabilidad que presentan es nulo, lo cuál evidencia aún más que la correlación entre danzabilidad y energía es muy baja, ya que de nuevo es extraño que canciones con mucha energía sean poco bailables.
+
+Por último, si analizamos el tercer clúster, vemos que son canciones con un alto nivel de acousticness, y niveles muy bajos de danzabilidad, energía, sonido, instrumentalidad, speechiness y valence. Esto parece evidente ya que en una canción acústica los instrumentos que aparecen no utilizan amplificación ni medios eléctricos, lo cual puede hacer que bajen los niveles de energía, sonido y danzabilidad. En sí, suelen ser canciones más tranquilas y menos movidas que el resto, siendo incluso muchas veces versiones relajadas de otras canciones. También, cabe destacar que las canciones de este grupo son las más duraderas respecto a la duración de las canciones del resto de grupos.
+
+Por tanto, podemos observar que realmente parece que los 3 clústers están muy diferenciados, tal y como habíamos previsto al analizar los centroides de cada grupo anteriormente a la hora de ejecutar el algoritmo K-medias. También esto lo vimos gráficamente al comparar las variables 2 a 2 y ver que en determinadas variables las diferencias entre grupos eran muy altas, y al hacer clúster con las componentes principales PCA, donde para PC4 que es la que decidimos quedarnos al realizar el estudio de PCA, los datos de los diferentes grupos gráficamente eran muy sencillos de diferenciar.
+
+Una vez visto esto, también vamos a realizar una tabla que nos indique la relación entre los clústers realizados y la variable respuesta.
+
+```{r}
+tabla_cluster3=table(clusters3.datosContEscalados$cluster,datos$target)
+tabla_cluster3
+```
+
+Se puede observar como la cantidad de superhits (1) en cada clúster es muy baja. Esto se debe a que nuestros datos están muy sesgados y la cantidad de 1's respecto a la cantidad de 0's es muy pequeña. Sin embargo, nos puede servir para ver el porcentaje de superhits (1's) que hay en cada uno de los clústers.
+
+```{r}
+prediccion_UNOS_cluster1 = tabla_cluster3[1,2]/(tabla_cluster3[1,1]+tabla_cluster3[1,2])
+porcentaje_cluster1 = prediccion_UNOS_cluster1*100
+porcentaje_cluster1
+
+prediccion_UNOS_cluster2 = tabla_cluster3[2,2]/(tabla_cluster3[2,1]+tabla_cluster3[2,2])
+porcentaje_cluster2 = prediccion_UNOS_cluster2 * 100
+porcentaje_cluster2
+
+prediccion_UNOS_cluster3 = tabla_cluster3[3,2]/(tabla_cluster3[3,1]+tabla_cluster3[3,2])
+porcentaje_cluster3 = prediccion_UNOS_cluster3 * 100
+porcentaje_cluster3
+```
+
+Se puede observar que en el primer clúster la cantidad de superhits esperada es aproximadamente 4 de cada 100 canciones, para el segundo clúster se espera que algo más de 5 canciones de cada 100 sean superhits, y para el último se espera que entre 1 y 2 canciones de cada 100 sean superhits. Por tanto, aunque los porcentajes de 1's en cada grupo sean muy bajos, donde mayor es el porcentaje es en el cluster 2, canciones donde predominan el speechiness y la danzabilidad. Luego según estamos viendo, la gente que escucha Spotify prefiere canciones con letra y que se puedan bailar frente a otro tipo de canciones.
+
+Sin embargo, hay que destacar que donde más cantidad de 1's hay es en el cluster 1, ya que aunque la probabilidad de encontrar un 1 respecto a un 0 sea menor que para el cluster 2, la cantidad de observaciones en el cluster 1 duplica a la cantidad de observaciones del cluster 2. El cluster 2 es un grupo más reducido que el resto, luego es muy interesante ya que en el grupo más reducido y exclusivo, la proporción de 1's es mayor. También, el hecho de que el cluster 3 tenga muy pocos superhits (1's) pensamos que se debe a que las personas prefieren canciones más enérgicas, bailables y con sonido, no canciones más relajadas, sobre todo en ambientes de fiesta y diversión.
+
+Podemos ver estos resultados gráficamente también. En primer lugar vemos una gráfica que separa los 0's de los 1's para ver la diferencia en cantidad de observaciones que en cada clúster que corresponden a 0's y a 1's.
+
+```{r}
+library(ggplot2)
+
+# Tu matriz de confusión
+matriz_confusion <- matrix(c(409, 16, 202, 11, 503, 8), nrow = 3, byrow = TRUE)
+rownames(matriz_confusion) <- c("Cluster 1", "Cluster 2", "Cluster 3")
+colnames(matriz_confusion) <- c("Target 0", "Target 1")
+
+# Convierte la matriz de confusión en un marco de datos para ggplot
+matriz_confusion_df <- as.data.frame(as.table(matriz_confusion))
+
+# Crea el gráfico de barras
+ggplot(matriz_confusion_df, aes(x = Var2, y = Freq, fill = Var1)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Matriz de Confusión",
+       x = "Valor Predicho",
+       y = "Frecuencia") +
+  scale_fill_manual(values = c("Cluster 1" = "blue", "Cluster 2" = "red", "Cluster 3" = "green")) +
+  theme_minimal()
+
+```
+
+En segundo lugar vamos a realizar la separación en clústers a la hora de graficar.
+
+```{r}
+library(ggplot2)
+
+# Tu matriz de confusión
+matriz_confusion <- matrix(c(409, 16, 202, 11, 503, 8), nrow = 3, byrow = TRUE)
+rownames(matriz_confusion) <- c("Cluster 1", "Cluster 2", "Cluster 3")
+colnames(matriz_confusion) <- c("Target 0", "Target 1")
+
+# Convierte la matriz de confusión en un marco de datos para ggplot
+matriz_confusion_df <- as.data.frame(as.table(matriz_confusion))
+
+# Crea el gráfico de barras
+ggplot(matriz_confusion_df, aes(x = Var1, y = Freq, fill = Var2)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Matriz de Confusión",
+       x = "Valor Predicho",
+       y = "Frecuencia") +
+  scale_fill_manual(values = c("Target 0" = "blue", "Target 1" = "red")) +
+  theme_minimal()
+
+```
+
+De esta manera se puede ver todo lo que habíamos comentado.
+
+
+## Clústering jerárquico
+
+Como hemos comentado antes, el clústering jerárquico es un método que se basa en la distancia eucídea (se pueden usar otras distancias) entre los datos para agruparlos dentro de clústers donde los elementos de cada clúster sean similares entre sí. Los elementos quedan anidados en jerarquías y, si los representamos gráficamente, obtenemos una especie de forma de árbol. En nuestro caso, no tiene mucho sentido hacer la representación gráfica ya que la cantidad de datos es elevada, pero igualmente lo haremos porque nos puede ayudar a sacar conclusiones.
+
+Vamos a realizar el clúster jerárquico para 3 clústers, ya que son los que finalmente hemos elegido cuando hemos hecho K-medias. Para calcular clusters jerárquicos, en primer lugar debemos obtener la matriz de distancias de los datos, para lo cuál vamos a usar directamente los datos escalados ya que hemos comprobado que los datos sin escalar no son correctos.
+
+```{r matriz de distancias euclídeas}
+matrizDist <- dist(datosContEscalados, method = "euclidean")
+```
+
+Una vez la tenemos, podemos pasar a calcular los clústers. En este tipo de clustering podemos elegir entre diferentes métodos de agrupación. Dichos métodos son “ward.D”, “single”, “complete”, “average”, “mcquitty”, “median” o “centroid”. Vamos a probar con varios a ver qué obtenemos.
+
+Utilizaremos en primer lugar el método “ward”, que minimiza la varianza total dentro de los grupos o clusters.
+
+```{r}
+clusterJer_ward <- hclust(matrizDist, method="ward.D")
+clusterJer_ward
+```
+
+Y dibujamos el dendrograma de los datos, que nos muestra el resultado y las etapas de agrupación.
+
+```{r}
+plot(clusterJer_ward, labels=rownames(datos),cex=0.7)  # Dendrograma
+```
+
+El dendrograma nos permite decidir el número de clusters que queremos obtener. En este caso se ven claramente varios grupos diferenciados. En concreto hemos dicho que vamos a quedarnos con 3 clusters, y vamos a recuadrar en el dendrograma cada uno de estos 3 grupos obtenidos. Lo haremos de dos formas, una por colores y otra con un único color.
+
+```{r}
+library(stats)
+plot(clusterJer_ward, labels=rownames(datos),cex=0.7)  # Dendrograma
+rect.hclust(clusterJer_ward, k=3, border="red")
+
+
+# Cortamos en 3 clusters por colores
+#sub_grp <- cutree(clusterJer_ward, k = 3)
+# Visualizamos el corte en el dendrograma
+#plot(clusterJer_ward, cex = 0.6)
+#rect.hclust(clusterJer_ward, k = 3, border = 2:5)
+```
+
+Se puede observar que los 3 grupos resultantes son bastante claros, sin embargo creemos que podemos afinar aún más y dividirlo en 5 grupos ya que a simple vista se aprecian 5 grupos bien diferenciados. Por tanto, si lo dividimos en dicha cantidad de grupos el resultado es el siguiente.
+
+```{r}
+# Cortamos en 5 clusters
+sub_grp <- cutree(clusterJer_ward, k = 5)
+# Visualizamos el corte en el dendrograma
+plot(clusterJer_ward, cex = 0.6)
+rect.hclust(clusterJer_ward, k = 5, border = 2:6)
+```
+
+Es interesante porque en clústering no jerarquico habíamos obtenido que la agrupación en 3 clústers era mejor con cierta diferencia hacia la agrupación en 5 clústers, pero en clústering jerárquico por el método de Ward vemos que gráficamente se aprecian claramente 5 grupos muy diferenciados.
+
+Probamos a realizarlo ahora por el método “complete” por ejemplo, para 5 clústers. Este método considera el mayor valor de las disimilitudes entre dos clústers como la distancia entre dichos clústers. Esto hace que produzca clusters más compactos.
+
+```{r}
+clusterJer_complete <- hclust(matrizDist, method="complete")
+# Cortamos en 3 clusters
+sub_grp <- cutree(clusterJer_complete, k = 5)
+# Visualizamos el corte en el dendrograma
+plot(clusterJer_complete, cex = 0.6)
+rect.hclust(clusterJer_complete, k = 5, border = 2:6)
+```
+
+Se puede observar que la división en 5 clústers por este método es muy pobre. Hay un grupo que ocupa la mayor cantidad de las observaciones, y otos 4 grupos prácticamente irreconocibles en el gráfico.
+
+Probamos a realizarlo ahora por el método “average”. Este método considera la media de las disimilitudes entre dos clústers como la distancia entre dichos clústers.
+
+```{r}
+clusterJer_average <- hclust(matrizDist, method="average")
+library(stats)
+plot(clusterJer_average, labels=rownames(datos),cex=0.7)  # Dendrograma
+rect.hclust(clusterJer_average, k=5, border="red")
+```
+De nuevo obtenemos algo similar a lo obtenido por el método complete. Por tanto, vemos que cada vez va a peor la división en clústers, por lo que en este caso el mejor método es el de Ward. Vamos a verlo numéricamente. Podemos calcular para ello el coeficiente aglomerativo, que mide la cantidad de estructura de agrupamiento encontrada en cada modelo. Entre los resultados obtenidos, los valores más cercanos a 1 suponen que la estructura de agrupamiento es más fuerte.
+
+```{r}
+# Clustering jerárquico usando enlace completo
+metodoComplete <- agnes(datosContEscalados, method = "complete" )
+complete = metodoComplete$ac
+complete
+
+# Clustering jerárquico usando enlace ward
+metodoWard <- agnes(datosContEscalados, method = "ward" )
+ward = metodoWard$ac
+ward
+
+# Clustering jerárquico usando enlace average
+metodoAverage <- agnes(datosContEscalados, method = "average" )
+average = metodoAverage$ac
+average
+```
+
+Vemos que efectivamente el que más se acerca a 1 es el modelo calculado mediante el método de Ward, luego confirmamos que es el mejor de los calculados, tal y como habíamos deducido gráficamente.
+
+
+Una vez tenemos que el de Ward es el mejor, podemos ver cómo quedaría la gráfica para una matriz de distancias donde la distancia no será la euclídea si no la distancia de canberra por ejemplo.
+
+```{r}
+matrizDist2 <- dist(datosContEscalados, method = "canberra")
+clusterJer_ward2 <- hclust(matrizDist2, method="ward.D")
+clusterJer_ward2
+plot(clusterJer_ward2, labels=rownames(datos),cex=0.7)  # Dendrograma
+```
+
+Hemos elegido esta distancia tras haber probado muchas otras, donde los resultados obtenidos eran similares o peores que los obtenidos por la distancia euclídea, y se puede observar como ahora hay una clara división de los datos en 2 grupos, aunque si quisiésemos afinar más, podríamos hacer una división en 4 o 5 grupos ya que se ve a simple vista que serían divisiones donde los grupos resultantes tendrían cantidades de datos similares y de características diferenciadas.
+
+
+### Conclusiones clústering jerárquico
+
+Tras realizar clústering jerárquico por diferentes métodos (Ward, Complete, Average...) nos hemos dado cuenta de que el resultado más óptimo para nuestros datos es tomar el método de Ward con la distancia euclídea y hacer una división en 5 clústers. Esto nos ha sorprendido ya que en clustering no jerárquico vimos que la división en 5 clústers era muy pobre ya que los grupos resultantes quedaban muy entremezclados, y que lo óptimo era dividir en 3 clústers. Sin embargo, aquí hemos obtenido que si dividimos nuestro conjunto de datos en 3 clústers se ve gráficamente que la división es muy mejorable, siendo mejorada considerablemente por una división en 5 grupos.
+
+Incluso hemos probado a utilizar otras distancias que no sean la euclídea (como la distancia de canberra) y hemos obtenido resultados muy similares, siendo 5 el número de clústers óptimos.
+
+Recuperando el resultado del método de Ward con la distancia euclídea,
+
+```{r}
+# Cortamos en 5 clusters
+sub_grp <- cutree(clusterJer_ward, k = 5)
+# Visualizamos el corte en el dendrograma
+plot(clusterJer_ward, cex = 0.6)
+rect.hclust(clusterJer_ward, k = 5, border = 2:6)
+```
+
+lo que nos interesa ahora es ver qué cantidad de 0's y 1's hay en cada grupo, viendo así la proporción de superhits en cada uno. Por tanto, realizamos una tabla del modelo y lo analizamos.
+```{r}
+tablaWard=table(cutree(clusterJer_ward, k=5),datos$target)
+tablaWard
+```
+
+Se puede observar que los tamaños de los grupos son muy diferentes. Hay un grupo con casi 400 canciones, mientras que hay otro con poco más de 100 canciones. Cabe destacar que el grupo 5 tiene una proporción de casi 10 superhits por cada 100 canciones, una cantidad muy buena, mientras que el grupo 2 tiene por ejemplo 0 por cada 100 canciones. Por tanto, es razonable ver qué variables predominan en cada grupo. Lo vemos similar a como lo hemos visto en clústering no jerárquico.
+
+```{r}
+library(parameters)
+res_kmeans2 <- cluster_analysis(datosContEscalados, n=5, method="hclust", distance_method = "euclidean", hclust_method = "ward.D")
+plot(summary(res_kmeans2))
+```
+
+Se observan cosas muy diferentes a lo obtenido en clústering no jerárquico. En este caso el grupo con mayor speechiness es el que no tiene ningún superhit, mientras que en clústering no jerárquico el grupo con esta característica era el que mayor cantidad de superhits tenía. En este caso el grupo con mayor porcentaje de 1's es el que tiene menor energía, loudnes, speechiness, instrumentalidad... totalmente al contrario que en clústering no jerárquico. 
+
+Estos resultados son algo contradictorios, y como según nuestros conocimientos sobre música los resultados que más cuadran respecto a la realidad son los de clústering no jerárquico para 3 clústers, consideramos que ha sido interesante realizar este análisis de clústering jerárquico pero no vamos a tenerlo en cuenta.
+
+
+## KNN
+
+El algoritmo de KNN o de k vecinos más cercanos, es un algoritmo que puede ser tanto de aprendizaje supervisado como no supervisado. En el caso de aprendizaje no supervisado se utiliza para problemas sobre la agrupación de datos en clústers y podemos hacer posteriormente predicciones sobre la agrupación realizada.
+
+Vamos a realizar el estudio KNN para un número k de vecinos que vamos a calcular previamente. Obteniendo como resultado
+
+```{r}
+k = length(datosModificados$year)^((4)/(22+4)) # 22 es el numero de variables que tenemos
+k = round(k)
+k
+```
+
+se tiene que k = 3. Una vez tenemos esto pasamos al algoritmo KNN con k=3.
+
+```{r KNN}
+KNN <- factor(datos$target, labels = c("0", "1"))
+# Calculamos el número de vecinos
+n <- length(datosModificados$year)^((4)/(22+4)) # 22 es el numero de variables que tenemos
+n = round(n)
+# Nos queda que k = 3
+
+# Calculamos el modelo KNN
+modelo_KNN <- knn(train = datosCuant, test = datosCuant_Test, cl = KNN, k = n)
+
+# Vemos la tabla resultante
+tablaKNN = table(modelo_KNN, datos_test$target)
+tablaKNN
+
+```
+
+Se puede observar que la cantidad de 0's que acierta es muy elevada pero la cantidad de 1's es algo pésima. Vamos a ver diferentes medidas para analizar el resultado. Comenzamos calculandos la exactitud obtenida en el método.
+
+```{r}
+exactitud_KNN = sum(diag(tablaKNN))/sum(tablaKNN)
+exactitud_KNN
+```
+
+Podemos observar que tenemos un 0,9773519 de exactitud en este modelo, una exactitud muy alta, por lo que podríamos pensar de primeras que es un buen modelo. Sin embargo, como comentamos al principio del trabajo, hemos sesgado mucho los datos al dividir las clases del target a partir de un valor de popularidad tan alto, 88. Esto hace que el modelo acierte considerablemente a la hora de predecir datos y por tanto es una medida que no podemos tener muy en cuenta.
+
+Otras medidas importantes que podemos calcular para analizar el modelo son las siguientes.
+
+Error: es el recíproco de la exactitud, pero al igual que antes será una medida que podemos tener poco en cuenta por el sesgo de nuestros datos.
+```{r}
+error_KNN = (tablaKNN[1,2] + tablaKNN[2,1])/sum(tablaKNN)
+error_KNN
+```
+
+Como hemos dicho, es justo el recíproco de la exactitud ya que si sumamos exactitud y error da 1.
+
+```{r}
+error_KNN + exactitud_KNN
+```
+
+Sensibilidad: es la tasa de verdaderos positivos, es decir, la probabilidad de que un 1 observado sea clasificado efectivamente como 1.
+
+```{r}
+sensibilidad_KNN = tablaKNN[2,2]/(tablaKNN[2,2] + tablaKNN[1,2])
+sensibilidad_KNN
+```
+
+Da una probabilidad bastante baja, 1 de cada 11. Por tanto, no acierta prácticamente ninguna de las canciones con una popularidad 1.
+
+Especificidad: es la tasa de verdaderos negativos, es decir, la probabilidad de que un 0 observado sea clasificado efectivamente como 0.
+
+```{r}
+especificidad_KNN = tablaKNN[1,1]/(tablaKNN[1,1] + tablaKNN[2,1])
+especificidad_KNN
+```
+
+Da una probabilidad muy alta, el modelo acierta casi todas las canciones con popularidad 0.
+
+Precisión: es el valor predictivo positivo, es decir, la probabilidad de acertar cuando se predice un valor 1.
+
+```{r}
+precision_KNN = tablaKNN[2,2]/(tablaKNN[2,2] + tablaKNN[2,1])
+precision_KNN
+```
+
+La precisión de acertar una canción con popularidad 1 cuando predecimos es de 1 de cada 4 (0,25), que aunque no sea un valor alto, puede ser correcto teniendo en cuenta el objetivo marcado.
+
+Podríamos obtener todas estas medidas y algunas más de la siguiente manera.
+
+```{r}
+#install.packages("caret")
+library(caret)
+
+# Convertir datos_test$target a factor con los mismos niveles que KNN
+datos_test$target <- factor(datos_test$target, levels = levels(KNN))
+
+# Calcular la matriz de confusión
+confusion_matrix <- confusionMatrix(modelo_KNN, datos_test$target)
+
+# Imprimir la matriz de confusión
+print(confusion_matrix)
+```
+
+
+### Conclusiones KNN
+
+Tras realizar el algoritmo KNN podemos extraer varias conclusiones. En primer lugar, hay que destacar que el hecho de que nuestros datos tengan un sesgo muy grande debido a la división realizada entre hits y superhits es algo que dificulta bastante la interpretación de los algoritmos. Esto está muy claro ya que si vemos la tabla obtenida en este algoritmo
+
+```{r}
+tablaKNN
+```
+
+esta tiene una exactitud de casi el 98% y un error de únicamente el 2%. Sin embargo, son medidas que no podemos considerar debido a ese sesgo, ya que al haber tanta diferencia entre la cantidad de 0's y 1's en nuestro conjunto, es evidente que tendrá mucha exactitud y poco error.
+
+Esto se puede ver muy claro si vemos los resultados de la tabla gráficamente.
+
+```{r}
+library(ggplot2)
+# Tu matriz de confusión
+matriz_confusion <- matrix(c(560, 10, 3, 1), nrow = 2, byrow = TRUE)
+rownames(matriz_confusion) <- c("Actual 0", "Actual 1")
+rownames(matriz_confusion) <- c("Predicho 0", "Predicho 1")
+
+# Convertimos la matriz de confusión en un data frame para usar el ggplot
+matriz_confusion_df <- as.data.frame(as.table(matriz_confusion))
+
+# Creamos el gráfico de barras
+ggplot(matriz_confusion_df, aes(x = Var2, y = Freq, fill = Var1)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Matriz de Confusión",
+       x = "Valor Predicho",
+       y = "Frecuencia") +
+  scale_fill_manual(values = c("Actual 0" = "blue", "Actual 1" = "red")) +
+  theme_minimal()
+```
+
+
+Pero dejando esto a un lado, lo que a nosotros nos interesa es la segunda fila de la tabla, en la cual se ve que se aciertan 1 de 4 observaciones, un número no muy alto pero muy correcto para nuestro objetivo. Por ejemplo, en el caso de que nosotros trabajásemos para una discográfica y tuviésemos que apostar por un grupo de canciones para ganar dinero de ellas, podríamos usar este modelo KNN para saber por qué canciones apostar. Por ello, nos interesa fijarnos en la segunda fila de la tabla, que son las canciones que el modelo predice como super hits. En este caso, seleccionaríamos 4 canciones de las cuales una va a ser realmente un super hit mundial. Esto es, tiene una precisión de 0,25, que aunque parezca muy baja, es realmente correcta ya que se apuesta por muy pocas canciones pero te aseguras al menos acertar una.
+
+Es más, podemos ir aún más lejos y ver cuáles son estas 4 canciones por las que apostaríamos para ver cuáles son sus popularidades.
+
+```{r canciones por las que apostamos}
+apuesta = datos_test[modelo_KNN==1,]
+View(apuesta)
+```
+
+Estas canciones podemos observar que son todas canciones muy actuales. Si las relacionamos ahora con la tabla de datos inicial, podemos ver cuál es la popularidad de dichas canciones realmente.
+
+```{r popularidad de las canciones por las que apostamos}
+# CANCION 1
+cancion1 <- "First Class"
+cancion_FC <- subset(datosBase, datosBase$track_name == cancion1)
+cancion_FC$track_popularity
+
+# CANCION 2
+cancion2 <- "Watermelon Sugar"
+cancion_WS <- subset(datosBase, datosBase$track_name == cancion2)
+cancion_WS$track_popularity
+
+# CANCION 3
+cancion3 <- "Don't Call Me Up"
+cancion_DCMU <- subset(datosBase, datosBase$track_name == cancion3)
+cancion_DCMU$track_popularity
+
+# CANCION 4
+cancion4 <- "Rain On Me (with Ariana Grande)"
+cancion_ROM <- subset(datosBase, datosBase$track_name == cancion4)
+cancion_ROM$track_popularity
+```
+
+Podemos ver que hay una canción que realmente supone un fallo grande a la hora de predecir, ya que tiene una popularidad de 24 y nos dice que apostásemos por ella. Esto puede deberse a que sea una observación atípica, ya que en esta base de datos todas las canciones deberían tener una popularidad relativamente alta y 24 sobre 100 es muy bajo. Además, es una canción conocida por alguno de los miembros del grupo.
+
+Algo muy interesante es que hay otras dos canciones que tienen una popularidad de 74 y 77, lo cual es una popularidad considerable, es decir, son canciones que no serán super hits pero serán muy conocidas mundialmente y, en el caso de la discográfica, podríamos ganar bastante dinero con ellas. Esto viene a decirnos que, aunque predecimos canciones que no sean super hits por como hemos definido el target, serán muy buenas canciones igualmente.
+
+Y por último, tenemos un superhit mundial con un 90 de popularidad. Además, el hecho de que salga dos veces la popularidad de esta canción supone que ha aparecido en dos años diferentes.
+
+Por tanto, estas 4 canciones por las que apostaríamos, en gran medida serían una buena apuesta para nuestra discográfica. Cabe destacar que con esto estamos respondiendo a otra de las preguntas que nos hicimos al iniciar el trabajo, ya que si observamos las dos canciones con mayor popularidad obtenidas, ambas pertenecen al género de pop, una evidencia más de que el pop es el género con mayor cantidad de superhits y canciones con una alta popularidad.
+
 
 
 ## 5.3 Arbol de decisión
